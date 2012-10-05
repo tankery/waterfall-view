@@ -67,7 +67,8 @@ public class ResourceLoaderTask extends AsyncTask<String, Object, Integer> {
                 InputStream is = (InputStream) url.getContent();
                 obj = streamDecoder.decodeFromStream(urlStr, is);
             } catch (IOException e) {
-                Log.e(tag, e.getMessage());
+                Log.e(tag,
+                      (e.getMessage() == null ? "Unknow IO exception" : e.getMessage()));
             } finally {
                 if (obj != null)
                     count++;

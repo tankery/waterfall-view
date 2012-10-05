@@ -90,42 +90,15 @@ public class PhotoLoader {
         }
     }
 
+    public void stopLoading() {
+        if (resourceLoaderTask != null)
+            resourceLoaderTask.cancel(true);
+        loadingType = ResourceLoadingType.NOT_START;
+    }
 
-    ResourceLoaderTask.StreamDecoder bitmapStreamDecoder = new ResourceLoaderTask.StreamDecoder() {
+    ResourceLoaderTask resourceLoaderTask;
 
-        @Override
-        public Object decodeFromStream(String url, InputStream is) {
-            Bitmap bmp = BitmapFactory.decodeStream(is);
-            if (bmp == null) {
-                onStateChangeListener.onErrorOccurred(BITMAP_LOAD_FAILED + ": " + url);
-                return null;
-            }
-            return new WebBitmap(url, bmp);
-        }
-    };
-
-    ResourceLoaderTask.StreamDecoder photoListStreamDecoder = new ResourceLoaderTask.StreamDecoder() {
-
-        @Override
-        public Object decodeFromStream(String url, InputStream is) {
-            String result = "";
-            try {
-                BufferedReader in =
-                        new BufferedReader(new InputStreamReader(is));
-                String inputLine;
-
-                while ((inputLine = in.readLine()) != null) {
-                    result = result.concat(inputLine);
-                }
-                in.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            return result;
-        }
-    };
-
-    ResourceLoaderTask.ResourceLoaderTaskListener taskListener =
+    private ResourceLoaderTask.ResourceLoaderTaskListener taskListener =
             new ResourceLoaderTask.ResourceLoaderTaskListener() {
 
                 @Override
@@ -151,15 +124,49 @@ public class PhotoLoader {
                 }
             };
 
-    Handler startLoadingHandle = new Handler() {
+    private ResourceLoaderTask.StreamDecoder bitmapStreamDecoder = new ResourceLoaderTask.StreamDecoder() {
+
+        @Override
+        public Object decodeFromStream(String url, InputStream is) {
+            Bitmap bmp = BitmapFactory.decodeStream(is);
+            if (bmp == null) {
+                onStateChangeListener.onErrorOccurred(BITMAP_LOAD_FAILED + ": " + url);
+                return null;
+            }
+            return new WebBitmap(url, bmp);
+        }
+    };
+
+    private ResourceLoaderTask.StreamDecoder photoListStreamDecoder = new ResourceLoaderTask.StreamDecoder() {
+
+        @Override
+        public Object decodeFromStream(String url, InputStream is) {
+            String result = "";
+            try {
+                BufferedReader in =
+                        new BufferedReader(new InputStreamReader(is));
+                String inputLine;
+
+                while ((inputLine = in.readLine()) != null) {
+                    result = result.concat(inputLine);
+                }
+                in.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            return result;
+        }
+    };
+
+    private Handler startLoadingHandle = new Handler() {
         @Override
         public void handleMessage(Message msg) {
             switch (ResourceLoadingType.values()[msg.what]) {
             case WEB_PHOTO_LIST: {
-                ResourceLoaderTask task = new ResourceLoaderTask();
-                task.setStreamDecoder(photoListStreamDecoder);
-                task.setResourceLoaderTaskListener(taskListener);
-                task.execute(fetchWebPhotoUrl);
+                resourceLoaderTask = new ResourceLoaderTask();
+                resourceLoaderTask.setResourceLoaderTaskListener(taskListener);
+                resourceLoaderTask.setStreamDecoder(photoListStreamDecoder);
+                resourceLoaderTask.execute(fetchWebPhotoUrl);
                 Log.d(tag, "start loading " + fetchWebPhotoUrl);
                 break;
             }
@@ -171,10 +178,10 @@ public class PhotoLoader {
                 for (int i = 0; i < count; i++) {
                     requests[i] = HOST_ADDRESS + urlRequests.poll();
                 }
-                ResourceLoaderTask task = new ResourceLoaderTask();
-                task.setStreamDecoder(bitmapStreamDecoder);
-                task.setResourceLoaderTaskListener(taskListener);
-                task.execute(requests);
+                resourceLoaderTask = new ResourceLoaderTask();
+                resourceLoaderTask.setResourceLoaderTaskListener(taskListener);
+                resourceLoaderTask.setStreamDecoder(bitmapStreamDecoder);
+                resourceLoaderTask.execute(requests);
                 Log.d(tag, "start loading " + urlRequests.toArray());
                 break;
             }
@@ -184,7 +191,7 @@ public class PhotoLoader {
         }
     };
 
-    public void startLoading() {
+    private void startLoading() {
         startLoadingHandle.obtainMessage(loadingType.ordinal()).sendToTarget();
     }
 

@@ -3,5 +3,7 @@
     <string name="app_name">FamilyPhotos</string>
     <string name="menu_settings">Settings</string>
     <string name="title_activity_home">FamilyPhotos</string>
+    <string name="waterfall_refresh">Refreshing</string>
+    <string name="waterfall_adding_item">Photo Adding</string>
 
 </resources>

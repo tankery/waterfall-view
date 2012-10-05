@@ -5,6 +5,7 @@ import java.util.Random;
 
 import tankery.app.family.photos.data.PhotoStorage;
 import tankery.app.family.photos.data.PhotoStorage.PhotoStorageListener;
+import tankery.app.familyphotos.R;
 
 import android.content.Context;
 import android.graphics.Color;
@@ -14,6 +15,7 @@ import android.util.AttributeSet;
 import android.util.Log;
 import android.view.WindowManager;
 import android.widget.LinearLayout;
+import android.widget.Toast;
 
 /**
  * The Waterfall view is a lazy vertical scroll view,
@@ -55,7 +57,33 @@ public class WaterfallView extends LazyVScrollView {
     public void init() {
         initLayout();
         initEvent();
-        PhotoStorage.getInstance().setPhotoCompressedWidth(columnWidth);
+        PhotoStorage storage = PhotoStorage.getInstance();
+        storage.setPhotoCompressedWidth(columnWidth);
+        storage.setOnFetchingFinishedListener(
+               new PhotoStorageListener() {
+
+                   @Override
+                   public void onListFetchingFinished() {
+                       needAppendNewItems();
+                   }
+
+                   @Override
+                   public void onPhotoReceived(int id) {
+                       ArrayList<Integer> list = new ArrayList<Integer>();
+                       list.add(id);
+                       doAppendNewItems(list);
+                   }
+
+                   @Override
+                   public void onPhotoFetchingFinished(
+                           ArrayList<Integer> updatedIdList) {
+                       // don't append new item when finished
+                       // cause i have move the new item adding to the time
+                       // each photo received.
+                       // doAppendNewItems(updatedIdList);
+                   }
+               });
+        storage.refreshPhotoList();
         // append new item at initial.
         needAppendNewItems();
     }
@@ -91,12 +119,21 @@ public class WaterfallView extends LazyVScrollView {
             @Override
             public void onTopReached() {
                 Log.d(tag, "Scrolled to top");
-                // TODO: refresh.
+                Toast.makeText(getContext(), R.string.waterfall_refresh,
+                               Toast.LENGTH_SHORT)
+                     .show();
+                PhotoStorage.getInstance().refreshPhotoList();
+                for (WaterfallItemColumn column : itemColumns) {
+                    column.removeAllViews();
+                }
             }
 
             @Override
             public void onBottomReached() {
                 Log.d(tag, "Scrolled to bottom");
+                Toast.makeText(getContext(), R.string.waterfall_adding_item,
+                               Toast.LENGTH_SHORT)
+                     .show();
                 needAppendNewItems();
             }
 
@@ -115,31 +152,6 @@ public class WaterfallView extends LazyVScrollView {
         public void handleMessage(Message msg) {
             PhotoStorage storage = PhotoStorage.getInstance();
             storage.fetchMorePhotos(PHOTO_FETCHING_COUNT);
-
-            storage.setOnFetchingFinishedListener(
-                   new PhotoStorageListener() {
-
-                       @Override
-                       public void onListFetchingFinished() {
-                           needAppendNewItems();
-                       }
-
-                       @Override
-                       public void onPhotoReceived(int id) {
-                           ArrayList<Integer> list = new ArrayList<Integer>();
-                           list.add(id);
-                           doAppendNewItems(list);
-                       }
-
-                       @Override
-                       public void onPhotoFetchingFinished(
-                               ArrayList<Integer> updatedIdList) {
-                           // don't append new item when finished
-                           // cause i have move the new item adding to the time
-                           // each photo received.
-                           // doAppendNewItems(updatedIdList);
-                       }
-                   });
         }
     };
 

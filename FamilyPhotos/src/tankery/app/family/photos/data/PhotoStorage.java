@@ -32,6 +32,8 @@ public class PhotoStorage {
 
     private int currentIndex = 0;
 
+    private boolean photoFetchingFinished = true;
+
     private int photoCompressedWidth = 0;
 
     private static PhotoStorage instance = null;
@@ -51,9 +53,19 @@ public class PhotoStorage {
             @Override
             public void onReceivedPhoto(WebBitmap bmp) {
                 int id = generateId(bmp.url);
+
+                if (photoTable.get(id) != null) {
+                    // already have this picture, delete the new bitmap and use
+                    // the old one.
+                    bmp.bitmap.recycle();
+                    bmp = photoTable.get(id);
+                }
+                else {
+                    // add this new bitmap to table and compress it.
+                    photoTable.put(id, bmp);
+                    compressBitmap(bmp);
+                }
                 updatedPhotoIdList.add(id);
-                photoTable.append(id, bmp);
-                compressBitmap(bmp);
                 photoStorageListener.onPhotoReceived(id);
             }
 
@@ -61,6 +73,7 @@ public class PhotoStorage {
             public void onFinishedPhotoFetching() {
                 currentIndex += updatedPhotoIdList.size();
                 photoStorageListener.onPhotoFetchingFinished(updatedPhotoIdList);
+                photoFetchingFinished = true;
             }
 
             @Override
@@ -69,8 +82,6 @@ public class PhotoStorage {
             }
 
         });
-        
-        photoLoader.fetchWebPhotoList();
     }
 
     public static PhotoStorage getInstance() {
@@ -86,12 +97,22 @@ public class PhotoStorage {
         this.photoStorageListener = onFetchingFinishedListener;
     }
 
+    public void refreshPhotoList() {
+        if (photoListOnWeb != null)
+            photoListOnWeb.clear();
+        currentIndex = 0;
+        photoLoader.stopLoading();
+        photoLoader.fetchWebPhotoList();
+        photoFetchingFinished = true;
+    }
+
     // Note this function can only calling in UI thread.
     public void fetchMorePhotos(int number) {
-        if (photoListOnWeb == null)
+        if (photoListOnWeb == null || !photoFetchingFinished)
             return;
 
         updatedPhotoIdList.clear();
+        photoFetchingFinished = false;
 
         int expectedIndex = Math.min(photoListOnWeb.size(),
                                      currentIndex + number);

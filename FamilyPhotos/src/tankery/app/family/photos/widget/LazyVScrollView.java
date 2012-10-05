@@ -101,11 +101,12 @@ public class LazyVScrollView extends ScrollView {
         public void handleMessage(Message msg) {
             super.handleMessage(msg);
 
-            if (child.getMeasuredHeight() - CONTENT_LOAD_THRESHOLD_HEIGHT <= 
+            // the on top reached event should judged before bottom reached.
+            if (getScrollY() == 0) {
+                onScrollListener.onTopReached();
+            } else if (child.getMeasuredHeight() - CONTENT_LOAD_THRESHOLD_HEIGHT <=
                     getScrollY() + getHeight()) {
                 onScrollListener.onBottomReached();
-            } else if (getScrollY() == 0) {
-                onScrollListener.onTopReached();
             } else {
                 onScrollListener.onScrolling();
             }
