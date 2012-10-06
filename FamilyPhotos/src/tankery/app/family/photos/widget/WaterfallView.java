@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Random;
 
 import tankery.app.family.photos.data.PhotoStorage;
+import tankery.app.family.photos.data.PhotoStorage.PhotoStorageError;
 import tankery.app.family.photos.data.PhotoStorage.PhotoStorageListener;
 import tankery.app.familyphotos.R;
 
@@ -36,6 +37,11 @@ public class WaterfallView extends LazyVScrollView {
     private int columnWidth;
 
     private ArrayList<WaterfallItemColumn> itemColumns;
+
+    private enum WaterfallErrorType {
+        UNKNOW_ERROR,
+        PHOTO_FETCHING_TIMEOUT
+    }
 
     public WaterfallView(Context context) {
         super(context);
@@ -82,10 +88,34 @@ public class WaterfallView extends LazyVScrollView {
                        // each photo received.
                        // doAppendNewItems(updatedIdList);
                    }
+
+                   @Override
+                   public void onStorageErrorOccurred(PhotoStorageError err) {
+                       switch (err) {
+                       case HTTP_CONNETION_TIMEOUT:
+                           int what = WaterfallErrorType.PHOTO_FETCHING_TIMEOUT.ordinal();
+                           waterfallErrorHandler.obtainMessage(what)
+                                                .sendToTarget();
+                           break;
+                       default:
+                           what = WaterfallErrorType.UNKNOW_ERROR.ordinal();
+                           waterfallErrorHandler.obtainMessage(what, err.name())
+                                                .sendToTarget();
+                           break;
+                       }
+                   }
                });
         storage.refreshPhotoList();
         // append new item at initial.
         needAppendNewItems();
+    }
+
+    protected void showUserMessage(String msg) {
+        Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
+    }
+
+    protected void showUserMessage(int resId) {
+        Toast.makeText(getContext(), resId, Toast.LENGTH_SHORT).show();
     }
 
     private void initLayout() {
@@ -119,9 +149,7 @@ public class WaterfallView extends LazyVScrollView {
             @Override
             public void onTopReached() {
                 Log.d(tag, "Scrolled to top");
-                Toast.makeText(getContext(), R.string.waterfall_refresh,
-                               Toast.LENGTH_SHORT)
-                     .show();
+                showUserMessage(R.string.waterfall_refresh);
                 PhotoStorage.getInstance().refreshPhotoList();
                 for (WaterfallItemColumn column : itemColumns) {
                     column.removeAllViews();
@@ -131,9 +159,7 @@ public class WaterfallView extends LazyVScrollView {
             @Override
             public void onBottomReached() {
                 Log.d(tag, "Scrolled to bottom");
-                Toast.makeText(getContext(), R.string.waterfall_adding_item,
-                               Toast.LENGTH_SHORT)
-                     .show();
+                showUserMessage(R.string.waterfall_adding_item);
                 needAppendNewItems();
             }
 
@@ -147,7 +173,32 @@ public class WaterfallView extends LazyVScrollView {
         });
     }
 
-    Handler needAppendNewItemsHandler = new Handler() {
+    private final Handler waterfallErrorHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            final WaterfallErrorType types[] = WaterfallErrorType.values();
+            if (msg.what >= types.length) {
+                Log.e(tag, "msg.what =" + msg.what +
+                           " is out of WaterfallErrorType.");
+                return;
+            }
+            switch (types[msg.what]) {
+            case UNKNOW_ERROR:
+                showUserMessage((String) msg.obj);
+                break;
+            case PHOTO_FETCHING_TIMEOUT:
+                showUserMessage(R.string.app_err_connection_timeout);
+                break;
+            default:
+                Log.e(tag, types[msg.what].name() + " is invalidate.");
+                break;
+            }
+            PhotoStorage storage = PhotoStorage.getInstance();
+            storage.fetchMorePhotos(PHOTO_FETCHING_COUNT);
+        }
+    };
+
+    private final static Handler needAppendNewItemsHandler = new Handler() {
         @Override
         public void handleMessage(Message msg) {
             PhotoStorage storage = PhotoStorage.getInstance();

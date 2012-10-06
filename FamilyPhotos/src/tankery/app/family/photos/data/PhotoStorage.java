@@ -3,8 +3,8 @@ package tankery.app.family.photos.data;
 import java.util.ArrayList;
 import java.util.Arrays;
 
-import tankery.app.family.photos.data.PhotoLoader.OnStateChangeListener;
-import tankery.app.family.photos.data.PhotoLoader.WebBitmap;
+import tankery.app.family.photos.data.NetworkPhotoLoader.ResourceLoadingError;
+import tankery.app.family.photos.data.NetworkPhotoLoader.WebBitmap;
 
 import android.graphics.Bitmap;
 import android.util.Log;
@@ -21,25 +21,31 @@ public class PhotoStorage {
         void onListFetchingFinished();
         void onPhotoReceived(int id);
         void onPhotoFetchingFinished(ArrayList<Integer> updatedIdList);
+        void onStorageErrorOccurred(PhotoStorageError err);
+    }
+
+    public enum PhotoStorageError {
+        UNKNOW_ERROR,
+        HTTP_CONNETION_TIMEOUT
     }
 
     private ArrayList<String> photoListOnWeb;
     private SparseArray<WebBitmap> photoTable = new SparseArray<WebBitmap>();
-    private PhotoLoader photoLoader = new PhotoLoader();
+    private PhotoLoader photoLoader = new NetworkPhotoLoader();
 
     private ArrayList<Integer> updatedPhotoIdList = new ArrayList<Integer>();
     private PhotoStorageListener photoStorageListener;
 
     private int currentIndex = 0;
 
-    private boolean photoFetchingFinished = true;
+    private boolean inPhotoFetchingNow = false;
 
     private int photoCompressedWidth = 0;
 
     private static PhotoStorage instance = null;
 
     private PhotoStorage() {
-        photoLoader.setOnStateChangeListener(new OnStateChangeListener() {
+        photoLoader.setPhotoLoaderListener(new PhotoLoaderListener() {
 
             @Override
             public void onReceivedPhotoList(String[] list) {
@@ -73,12 +79,20 @@ public class PhotoStorage {
             public void onFinishedPhotoFetching() {
                 currentIndex += updatedPhotoIdList.size();
                 photoStorageListener.onPhotoFetchingFinished(updatedPhotoIdList);
-                photoFetchingFinished = true;
+                inPhotoFetchingNow = false;
             }
 
             @Override
-            public void onErrorOccurred(String err) {
-                Log.e(tag, err);
+            public void onErrorOccurred(ResourceLoadingError err, String url) {
+                switch (err) {
+                case HTTP_CONNETION_TIMEOUT:
+                    photoStorageListener.onStorageErrorOccurred(PhotoStorageError.HTTP_CONNETION_TIMEOUT);
+                    break;
+                default:
+                    Log.e(tag, err.name() +
+                               (url.isEmpty() ? "" : " on fetching " + url));
+                    break;
+                }
             }
 
         });
@@ -103,16 +117,16 @@ public class PhotoStorage {
         currentIndex = 0;
         photoLoader.stopLoading();
         photoLoader.fetchWebPhotoList();
-        photoFetchingFinished = true;
+        inPhotoFetchingNow = false;
     }
 
     // Note this function can only calling in UI thread.
     public void fetchMorePhotos(int number) {
-        if (photoListOnWeb == null || !photoFetchingFinished)
+        if (photoListOnWeb == null || inPhotoFetchingNow)
             return;
 
         updatedPhotoIdList.clear();
-        photoFetchingFinished = false;
+        inPhotoFetchingNow = true;
 
         int expectedIndex = Math.min(photoListOnWeb.size(),
                                      currentIndex + number);

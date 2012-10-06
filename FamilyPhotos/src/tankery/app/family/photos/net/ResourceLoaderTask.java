@@ -2,6 +2,10 @@ package tankery.app.family.photos.net;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.net.URL;
 
 import android.os.AsyncTask;
@@ -23,14 +27,17 @@ public class ResourceLoaderTask extends AsyncTask<String, Object, Integer> {
 
     static final String tag = "ResourceLoaderTask";
 
+    static final int HTTP_CONNECT_TIMEOUT = 3000;
+    static final int HTTP_READ_TIMEOUT = 5000;
+
     public interface StreamDecoder {
         Object decodeFromStream(String url, InputStream is);
     }
 
     public interface ResourceLoaderTaskListener {
         void onResourceReceived(Object obj);
-
         void onFinished(int count);
+        void onConnectionTimeout();
     }
 
     // Default stream decoder will do nothing but return the stream directly.
@@ -61,18 +68,45 @@ public class ResourceLoaderTask extends AsyncTask<String, Object, Integer> {
             if (urlStr == null || urlStr.isEmpty())
                 continue;
 
-            Object obj = null;
             try {
+                Object obj = null;
                 URL url = new URL(urlStr);
-                InputStream is = (InputStream) url.getContent();
-                obj = streamDecoder.decodeFromStream(urlStr, is);
+                HttpURLConnection httpconn = (HttpURLConnection) url.openConnection();
+                try {
+                    httpconn.setConnectTimeout(HTTP_CONNECT_TIMEOUT);
+                    httpconn.setReadTimeout(HTTP_READ_TIMEOUT);
+                    httpconn.setDoInput(true);
+                    if (httpconn.getResponseCode() == HttpURLConnection.HTTP_OK) {
+                        InputStream is = httpconn.getInputStream();
+                        obj = streamDecoder.decodeFromStream(urlStr, is);
+                    }
+                } catch (SocketException e) {
+                    Log.e(tag, (e.getMessage() == null ?
+                            "Unknow Socket exception" :
+                            e.getMessage()));
+                    resourceLoaderTaskListener.onConnectionTimeout();
+                } catch (SocketTimeoutException e) {
+                    Log.e(tag, (e.getMessage() == null ?
+                            "Unknow SocketTimeout exception" :
+                            e.getMessage()));
+                } catch (IOException e) {
+                    Log.e(tag, e.getClass().getName() + ": " +
+                               (e.getMessage() == null ?
+                                       "Unknow IO exception" :
+                                       e.getMessage()));
+                } finally {
+                    httpconn.disconnect();
+                    if (obj != null)
+                        count++;
+                    publishProgress(obj);
+                }
+            } catch (MalformedURLException e) {
+                Log.e(tag, e.getMessage());
             } catch (IOException e) {
-                Log.e(tag,
-                      (e.getMessage() == null ? "Unknow IO exception" : e.getMessage()));
-            } finally {
-                if (obj != null)
-                    count++;
-                publishProgress(obj);
+                Log.e(tag, e.getClass().getName() + ": " +
+                           (e.getMessage() == null ?
+                                   "Unknow IO exception" :
+                                   e.getMessage()));
             }
 
             // Escape early if cancel() is called
@@ -96,6 +130,11 @@ public class ResourceLoaderTask extends AsyncTask<String, Object, Integer> {
     protected void onPostExecute(Integer count) {
         Log.d(tag, "Task finished.");
         resourceLoaderTaskListener.onFinished(count);
+    }
+
+    @Override
+    protected void onCancelled() {
+        Log.d(tag, "Task cancelled.");
     }
 
 }
