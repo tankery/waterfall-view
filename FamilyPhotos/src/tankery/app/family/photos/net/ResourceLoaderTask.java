@@ -7,6 +7,7 @@ import java.net.MalformedURLException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.URL;
+import java.net.URLConnection;
 
 import android.os.AsyncTask;
 import android.util.Log;
@@ -71,13 +72,16 @@ public class ResourceLoaderTask extends AsyncTask<String, Object, Integer> {
             try {
                 Object obj = null;
                 URL url = new URL(urlStr);
-                HttpURLConnection httpconn = (HttpURLConnection) url.openConnection();
+                URLConnection conn = url.openConnection();
                 try {
-                    httpconn.setConnectTimeout(HTTP_CONNECT_TIMEOUT);
-                    httpconn.setReadTimeout(HTTP_READ_TIMEOUT);
-                    httpconn.setDoInput(true);
-                    if (httpconn.getResponseCode() == HttpURLConnection.HTTP_OK) {
-                        InputStream is = httpconn.getInputStream();
+                    conn.setConnectTimeout(HTTP_CONNECT_TIMEOUT);
+                    conn.setReadTimeout(HTTP_READ_TIMEOUT);
+                    conn.setDoInput(true);
+                    String protocol = url.getProtocol();
+                    if (protocol.equals("file") ||
+                        (protocol.equals("http") && ((HttpURLConnection) conn).getResponseCode()
+                            == HttpURLConnection.HTTP_OK)) {
+                        InputStream is = conn.getInputStream();
                         obj = streamDecoder.decodeFromStream(urlStr, is);
                     }
                 } catch (SocketException e) {
@@ -95,7 +99,6 @@ public class ResourceLoaderTask extends AsyncTask<String, Object, Integer> {
                                        "Unknow IO exception" :
                                        e.getMessage()));
                 } finally {
-                    httpconn.disconnect();
                     if (obj != null)
                         count++;
                     publishProgress(obj);

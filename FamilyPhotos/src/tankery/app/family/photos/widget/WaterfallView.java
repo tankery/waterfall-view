@@ -65,6 +65,7 @@ public class WaterfallView extends LazyVScrollView {
         initEvent();
         PhotoStorage storage = PhotoStorage.getInstance();
         storage.setPhotoCompressedWidth(columnWidth);
+        storage.setUseTempPhotoFile(getContext());
         storage.setOnFetchingFinishedListener(
                new PhotoStorageListener() {
 

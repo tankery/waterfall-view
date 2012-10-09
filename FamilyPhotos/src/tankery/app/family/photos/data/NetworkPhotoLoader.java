@@ -1,19 +1,25 @@
 package tankery.app.family.photos.data;
 
 import java.io.BufferedReader;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.Queue;
 
 import tankery.app.family.photos.net.ResourceLoaderTask;
 
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Handler;
 import android.os.Message;
 import android.util.Log;
+import android.util.SparseArray;
 
 public class NetworkPhotoLoader implements PhotoLoader {
 
@@ -45,6 +51,10 @@ public class NetworkPhotoLoader implements PhotoLoader {
     }
 
     private PhotoLoaderListener photoLoaderListener;
+
+    private Context applicationContext = null;
+    private ArrayList<String> tempPhotoFileList = null;
+    private SparseArray<String> tempFileUrlTable = new SparseArray<String>();
     
     private String fetchWebPhotoUrl = MYHOME_SERVER_URL +
                                       "?action=ls&act_para=/test_waterfall&";
@@ -63,11 +73,28 @@ public class NetworkPhotoLoader implements PhotoLoader {
         this.photoLoaderListener = listener;
     }
 
+    public void useTempPhotoFile(Context appContext) {
+        if (appContext == null)
+            return;
+        applicationContext = appContext;
+        tempPhotoFileList =
+                new ArrayList<String>(Arrays.asList(applicationContext.fileList()));
+    }
+
     /* (non-Javadoc)
      * @see tankery.app.family.photos.data.PhotoLoader#addLoadRequest(java.lang.String)
      */
     @Override
     public void addLoadRequest(String urlStr) {
+        String tempFilename = generateTempFileName(urlStr);
+        if (fileInTempFolder(tempFilename)) {
+            // photo is stored in temperate directory, change to load with it.
+            tempFileUrlTable.append(Integer.parseInt(tempFilename), urlStr);
+            urlStr = generateTempFileUrl(tempFilename);
+        }
+        else {
+            urlStr = longUrl(urlStr);
+        }
         // add the url string to load queue,
         urlRequests.add(urlStr);
 
@@ -110,6 +137,7 @@ public class NetworkPhotoLoader implements PhotoLoader {
                     if (obj instanceof WebBitmap) {
                         WebBitmap bmp = (WebBitmap) obj;
                         photoLoaderListener.onReceivedPhoto(bmp);
+                        saveBitmapToFileIfNeed(bmp);
                     }
                     else if (obj instanceof String) {
                         String result = (String) obj;
@@ -142,6 +170,10 @@ public class NetworkPhotoLoader implements PhotoLoader {
                 photoLoaderListener.onErrorOccurred(ResourceLoadingError.BITMAP_DECODE_NULL,
                                                       url);
                 return null;
+            }
+            String mabeFilename = parseTempFileUrl(url);
+            if (mabeFilename != null) {
+                url = tempFileUrlTable.get(Integer.parseInt(mabeFilename));
             }
             return new WebBitmap(url, bmp);
         }
@@ -196,7 +228,7 @@ public class NetworkPhotoLoader implements PhotoLoader {
                     break;
                 String[] requests = new String[count];
                 for (int i = 0; i < count; i++) {
-                    requests[i] = HOST_ADDRESS + urlRequests.poll();
+                    requests[i] = urlRequests.poll();
                 }
                 resourceLoaderTask = new ResourceLoaderTask();
                 resourceLoaderTask.setResourceLoaderTaskListener(taskListener);
@@ -214,6 +246,60 @@ public class NetworkPhotoLoader implements PhotoLoader {
 
     private void updateLoading() {
         updateLoadingHandle.obtainMessage(loadingType.ordinal()).sendToTarget();
+    }
+
+    private void saveBitmapToFileIfNeed(WebBitmap bmp) {
+        if (tempPhotoFileList == null)
+            return;
+
+        // save photo to temp file if not exist yet.
+        String filename = generateTempFileName(bmp.url);
+        if (!fileInTempFolder(filename)) {
+            tempPhotoFileList.add(filename);
+            FileOutputStream fos;
+            try {
+                fos = applicationContext.openFileOutput(filename,
+                                                        Context.MODE_PRIVATE);
+                bmp.bitmap.compress(Bitmap.CompressFormat.PNG,
+                                    90, fos);
+                fos.close();
+            } catch (FileNotFoundException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            } catch (IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private String shortUrl(String url) {
+        return url.contains(HOST_ADDRESS) ?
+                url.substring(HOST_ADDRESS.length()) :
+                url;
+    }
+
+    private String longUrl(String url) {
+        return url.contains(HOST_ADDRESS) ?
+                url :
+                HOST_ADDRESS + url;
+    }
+
+    private boolean fileInTempFolder(String filename) {
+        return tempPhotoFileList != null && tempPhotoFileList.contains(filename);
+    }
+
+    private String generateTempFileName(String url) {
+        return String.valueOf(shortUrl(url).hashCode());
+    }
+
+    private String generateTempFileUrl(String filename) {
+        return "file://" + applicationContext.getFilesDir() + "/" + filename;
+    }
+
+    private String parseTempFileUrl(String url) {
+        String prefix = "file://" + applicationContext.getFilesDir() + "/";
+        return url.contains(prefix) ? url.substring(prefix.length()) : null;
     }
 
 }

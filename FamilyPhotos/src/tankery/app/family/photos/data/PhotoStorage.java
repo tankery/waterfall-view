@@ -2,10 +2,10 @@ package tankery.app.family.photos.data;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-
 import tankery.app.family.photos.data.NetworkPhotoLoader.ResourceLoadingError;
 import tankery.app.family.photos.data.NetworkPhotoLoader.WebBitmap;
 
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.util.Log;
 import android.util.SparseArray;
@@ -31,7 +31,7 @@ public class PhotoStorage {
 
     private ArrayList<String> photoListOnWeb;
     private SparseArray<WebBitmap> photoTable = new SparseArray<WebBitmap>();
-    private PhotoLoader photoLoader = new NetworkPhotoLoader();
+    private NetworkPhotoLoader photoLoader = new NetworkPhotoLoader();
 
     private ArrayList<Integer> updatedPhotoIdList = new ArrayList<Integer>();
     private PhotoStorageListener photoStorageListener;
@@ -111,6 +111,14 @@ public class PhotoStorage {
         this.photoStorageListener = onFetchingFinishedListener;
     }
 
+    public void setPhotoCompressedWidth(int width) {
+        photoCompressedWidth = width;
+    }
+
+    public void setUseTempPhotoFile(Context appContext) {
+        photoLoader.useTempPhotoFile(appContext);
+    }
+
     public void refreshPhotoList() {
         if (photoListOnWeb != null)
             photoListOnWeb.clear();
@@ -155,10 +163,6 @@ public class PhotoStorage {
                                                      false);
         bmp.bitmap.recycle();
         bmp.bitmap = newBitmap;
-    }
-
-    public void setPhotoCompressedWidth(int width) {
-        photoCompressedWidth = width;
     }
 
 }
