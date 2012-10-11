@@ -60,14 +60,15 @@ public class PhotoStorage {
             public void onReceivedPhoto(WebBitmap bmp) {
                 int id = generateId(bmp.url);
 
-                if (photoTable.get(id) != null) {
-                    // already have this picture, delete the new bitmap and use
-                    // the old one.
-                    bmp.bitmap.recycle();
-                    bmp = photoTable.get(id);
+                WebBitmap wbmp = photoTable.get(id);
+                if (wbmp != null && wbmp.bitmap != null &&
+                        !wbmp.bitmap.isRecycled()) {
+                    // already have this picture, delete the new bitmap.
+                    if (bmp.bitmap != null && !bmp.bitmap.isRecycled())
+                        bmp.bitmap.recycle();
                 }
                 else {
-                    // add this new bitmap to table and compress it.
+                    // put this new bitmap to table and compress it.
                     photoTable.put(id, bmp);
                     compressBitmap(bmp);
                 }
@@ -145,8 +146,18 @@ public class PhotoStorage {
 
     public Bitmap getPhoto(int id) {
         WebBitmap wbmp = photoTable.get(id);
-        Log.d(tag, "getPhoto " + wbmp.url);
+        if (wbmp == null)
+            return null;
         return wbmp.bitmap;
+    }
+
+    public void setPhoto(int id, Bitmap bmp) {
+        WebBitmap wbmp = photoTable.get(id);
+        if (wbmp == null || wbmp.bitmap == bmp)
+            return;
+        if (wbmp.bitmap != null && !wbmp.bitmap.isRecycled())
+            wbmp.bitmap.recycle();
+        wbmp.bitmap = bmp;
     }
 
     private int generateId(String url) {

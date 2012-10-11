@@ -125,7 +125,6 @@ public class ResourceLoaderTask extends AsyncTask<String, Object, Integer> {
         if (objs == null || objs.length == 0)
             return;
         Object obj = objs[0];
-        Log.d(tag, "Received " + (obj == null ? "null" : obj.toString()));
         resourceLoaderTaskListener.onResourceReceived(obj);
     }
 

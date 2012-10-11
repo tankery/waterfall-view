@@ -170,6 +170,11 @@ public class WaterfallView extends LazyVScrollView {
 
             @Override
             public void onScrollChanged(int t, int oldt) {
+                if (t != oldt) {
+                    for (WaterfallItemColumn col : itemColumns) {
+                        col.updateViewport(t, getMeasuredHeight());
+                    }
+                }
             }
         });
     }

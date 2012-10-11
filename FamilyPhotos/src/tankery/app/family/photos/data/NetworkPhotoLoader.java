@@ -18,6 +18,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Handler;
 import android.os.Message;
+import android.text.TextUtils;
 import android.util.Log;
 import android.util.SparseArray;
 
@@ -234,7 +235,8 @@ public class NetworkPhotoLoader implements PhotoLoader {
                 resourceLoaderTask.setResourceLoaderTaskListener(taskListener);
                 resourceLoaderTask.setStreamDecoder(bitmapStreamDecoder);
                 resourceLoaderTask.execute(requests);
-                Log.d(tag, "start loading " + urlRequests.toArray());
+                Log.d(tag,
+                      "start loading [" + TextUtils.join(", ", requests) + "]");
                 break;
             }
             default:
