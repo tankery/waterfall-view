@@ -8,6 +8,7 @@ import java.io.FileNotFoundException;
 import java.util.ArrayList;
 
 import tankery.app.family.photos.data.PhotoStorage;
+import tankery.app.family.photos.utils.AlgorithmHelper;
 
 import android.content.Context;
 import android.graphics.Bitmap;
@@ -134,9 +135,9 @@ public class WaterfallItemColumn extends LinearLayout {
         if (top > currentTop) {
             // viewport move down (scroll up).
             itemsNeedReload = getItemsInArea(Math.max(rCurBottom, rNewTop),
-                                              rNewBottom);
+                                             rNewBottom);
             itemsNeedRecycle = getItemsInArea(rCurTop,
-                                             Math.min(rCurBottom, rNewTop));
+                                              Math.min(rCurBottom, rNewTop));
         }
         else {
             // viewport move up (scroll down).
@@ -149,126 +150,66 @@ public class WaterfallItemColumn extends LinearLayout {
         currentTop = top;
 
         // do recycle and reload.
-        // TODO: put in new thread.
         reloadItems(itemsNeedReload);
         recycleItems(itemsNeedRecycle);
     }
 
+    private AlgorithmHelper.Comparetor<Integer>
+        positionToLineComparetor = new AlgorithmHelper.Comparetor<Integer>() {
+
+        @Override
+        public int compareTarget(Integer obj1, Integer obj2) {
+            return obj1 - obj2;
+        }
+
+        /**
+         * the position related to a line.
+         * 
+         * @param index
+         *            index of waterfall item in itemIdTable to compare
+         * @param topLine
+         *            the height of the top line
+         * @return if return < 0, item on the top of topLine, = 0, item overlap
+         *         line, > 0, item on the bottom of topLine.
+         */
+        @Override
+        public int itemRelatedToTarget(int index, Integer topLine) {
+            if (index >= itemIdTable.size())
+                return 1;
+            else if (index < 0)
+                return -1;
+
+            int nextItemTop = (index + 1 == itemIdTable.size()) ?
+                    getMeasuredHeight() :
+                    itemIdTable.keyAt(index + 1);
+            int itemTop = itemIdTable.keyAt(index);
+
+            if (nextItemTop <= topLine)
+                return -1;
+            else if (itemTop <= topLine && nextItemTop > topLine)
+                return 0;
+            else
+                return 1;
+        }
+    };
+
     private ArrayList<Integer> getItemsInArea(int top, int bottom) {
-        if (top >= bottom)
-            return null;
+        int[] indexes =
+                AlgorithmHelper.binaryFindBetween(0,
+                                                  itemIdTable.size(),
+                                                  top, bottom,
+                                                  positionToLineComparetor);
 
-        int topItemIndex = -1;
-        int bottomItemIndex = -1;
-
-        // using binary search to find the items at top and bottom.
-        int start, end, midPt = 0;
-        start = 0;
-        end = itemIdTable.size() - 1;
-        // first, find the item between the search area.
-        while (start <= end) {
-            midPt = (start + end) / 2;
-            int itemToTop = positionRelatedToLine(midPt, top);
-            int itemToBottom = positionRelatedToLine(midPt, bottom);
-            if (itemToTop == 0) {
-                topItemIndex = midPt;
-                break;
-            } else if (itemToBottom == 0) {
-                bottomItemIndex = midPt;
-                break;
-            } else if (itemToTop > 0 && itemToBottom < 0) {
-                // find the center item, just break;
-                break;
-            } else if (itemToTop < 0) {
-                start = midPt + 1;
-            } else if (itemToBottom > 0) {
-                end = midPt - 1;
-            }
-        }
-
-        if (start > end)
-            return null; // not found.
-
-        // if item on top not found, find it
-        if (topItemIndex == -1) {
-            int s, e, m;
-            s = start;
-            e = midPt - 1;
-            while (s <= e) {
-                m = (s + e) / 2;
-                int itemToTop = positionRelatedToLine(m, top);
-                if (itemToTop == 0) {
-                    topItemIndex = m;
-                    break;
-                } else if (itemToTop < 0) {
-                    s = m + 1;
-                } else if (itemToTop > 0) {
-                    e = m - 1;
-                }
-            }
-            if (s > e)
-                return null; // not found.
-        }
-
-        // if item on bottom not found, find it
-        if (bottomItemIndex == -1) {
-            int s, e, m;
-            s = midPt + 1;
-            e = end;
-            while (s <= e) {
-                m = (s + e) / 2;
-                int itemToBottom = positionRelatedToLine(m, bottom);
-                if (itemToBottom == 0) {
-                    bottomItemIndex = m;
-                    break;
-                } else if (itemToBottom < 0) {
-                    s = m + 1;
-                } else if (itemToBottom > 0) {
-                    e = m - 1;
-                }
-            }
-            if (s > e)
-                return null; // not found.
-        }
-
-        // one item on top and bottom at the same time, treat as not found.
-        if (topItemIndex == bottomItemIndex)
+        if (indexes == null)
             return null;
 
         ArrayList<Integer> result =
-                new ArrayList<Integer>(bottomItemIndex - topItemIndex);
-        for (int i = topItemIndex; i < bottomItemIndex; i++) {
+                new ArrayList<Integer>(indexes[1] - indexes[0]);
+        for (int i = indexes[0]; i < indexes[1]; i++) {
             result.add(itemIdTable.valueAt(i));
         }
 
         return result;
-    }
-
-    /**
-     * the position related to a line.
-     * 
-     * @param index
-     *            index of waterfall item in itemIdTable to compare
-     * @param topLine
-     *            the height of the top line
-     * @return if return < 0, item on the top of topLine, = 0, item overlap
-     *         line, > 0, item on the bottom of topLine.
-     */
-    private int positionRelatedToLine(int index, int topLine) {
-        if (index >= itemIdTable.size())
-            return 1;
-        else if (index < 0)
-            return -1;
-
-        int nextItemTop = index + 1 == itemIdTable.size() ? getMeasuredHeight() : itemIdTable.keyAt(index + 1);
-        int itemTop = itemIdTable.keyAt(index);
-
-        if (nextItemTop <= topLine)
-            return -1;
-        else if (itemTop <= topLine && nextItemTop > topLine)
-            return 0;
-        else
-            return 1;
     }
 
     private void reloadItems(final ArrayList<Integer> itemsNeedReload) {
