@@ -153,7 +153,7 @@ public class WaterfallView extends LazyVScrollView {
                 showUserMessage(R.string.waterfall_refresh);
                 PhotoStorage.getInstance().refreshPhotoList();
                 for (WaterfallItemColumn column : itemColumns) {
-                    column.removeAllViews();
+                    column.clear();
                 }
             }
 

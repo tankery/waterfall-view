@@ -53,6 +53,8 @@ public class NetworkPhotoLoader implements PhotoLoader {
 
     private PhotoLoaderListener photoLoaderListener;
 
+    private int photoCompressedWidth = 0;
+
     private Context applicationContext = null;
     private ArrayList<String> tempPhotoFileList = null;
     private SparseArray<String> tempFileUrlTable = new SparseArray<String>();
@@ -72,6 +74,10 @@ public class NetworkPhotoLoader implements PhotoLoader {
     @Override
     public void setPhotoLoaderListener(PhotoLoaderListener listener) {
         this.photoLoaderListener = listener;
+    }
+
+    public void setPhotoCompressedWidth(int width) {
+        photoCompressedWidth = width;
     }
 
     public void useTempPhotoFile(Context appContext) {
@@ -166,7 +172,10 @@ public class NetworkPhotoLoader implements PhotoLoader {
 
         @Override
         public Object decodeFromStream(String url, InputStream is) {
-            Bitmap bmp = BitmapFactory.decodeStream(is);
+            Bitmap bmp = null;
+            boolean compress = photoCompressedWidth != 0;
+            bmp = decodeStream(is, compress);
+
             if (bmp == null) {
                 photoLoaderListener.onErrorOccurred(ResourceLoadingError.BITMAP_DECODE_NULL,
                                                       url);
@@ -177,6 +186,27 @@ public class NetworkPhotoLoader implements PhotoLoader {
                 url = tempFileUrlTable.get(Integer.parseInt(mabeFilename));
             }
             return new WebBitmap(url, bmp);
+        }
+
+        private Bitmap decodeStream(InputStream is, boolean compress) {
+            // catch OOM exception.
+            Bitmap bmp = null;
+            try {
+                bmp = BitmapFactory.decodeStream(is);
+            } catch (OutOfMemoryError e) {
+                Log.e(tag, "Out of Memory Error!");
+                bmp = null;
+            }
+            if (bmp != null && compress) {
+                int width = photoCompressedWidth;
+                int height = (bmp.getHeight() * width) / bmp.getWidth();
+                Bitmap newBitmap = Bitmap.createScaledBitmap(bmp, width,
+                                                             height,
+                                                             false);
+                bmp.recycle();
+                bmp = newBitmap;
+            }
+            return bmp;
         }
     };
 

@@ -2,6 +2,9 @@ package tankery.app.family.photos.data;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
 import tankery.app.family.photos.data.NetworkPhotoLoader.ResourceLoadingError;
 import tankery.app.family.photos.data.NetworkPhotoLoader.WebBitmap;
 
@@ -33,14 +36,13 @@ public class PhotoStorage {
     private SparseArray<WebBitmap> photoTable = new SparseArray<WebBitmap>();
     private NetworkPhotoLoader photoLoader = new NetworkPhotoLoader();
 
+    Lock photoTableLock = new ReentrantLock();
+
     private ArrayList<Integer> updatedPhotoIdList = new ArrayList<Integer>();
     private PhotoStorageListener photoStorageListener;
 
     private int currentIndex = 0;
-
     private boolean inPhotoFetchingNow = false;
-
-    private int photoCompressedWidth = 0;
 
     private static PhotoStorage instance = null;
 
@@ -66,11 +68,13 @@ public class PhotoStorage {
                     // already have this picture, delete the new bitmap.
                     if (bmp.bitmap != null && !bmp.bitmap.isRecycled())
                         bmp.bitmap.recycle();
+                    bmp = wbmp;
                 }
                 else {
-                    // put this new bitmap to table and compress it.
+                    photoTableLock.lock();
+                    // put this new bitmap to table
                     photoTable.put(id, bmp);
-                    compressBitmap(bmp);
+                    photoTableLock.unlock();
                 }
                 updatedPhotoIdList.add(id);
                 photoStorageListener.onPhotoReceived(id);
@@ -113,7 +117,7 @@ public class PhotoStorage {
     }
 
     public void setPhotoCompressedWidth(int width) {
-        photoCompressedWidth = width;
+        photoLoader.setPhotoCompressedWidth(width);
     }
 
     public void setUseTempPhotoFile(Context appContext) {
@@ -155,25 +159,15 @@ public class PhotoStorage {
         WebBitmap wbmp = photoTable.get(id);
         if (wbmp == null || wbmp.bitmap == bmp)
             return;
+        photoTableLock.lock();
         if (wbmp.bitmap != null && !wbmp.bitmap.isRecycled())
             wbmp.bitmap.recycle();
         wbmp.bitmap = bmp;
+        photoTableLock.unlock();
     }
 
     private int generateId(String url) {
         return url.hashCode();
-    }
-
-    private void compressBitmap(WebBitmap bmp) {
-        if (photoCompressedWidth == 0)
-            // no need to compress.
-            return;
-        int width = photoCompressedWidth;
-        int height = (bmp.bitmap.getHeight() * width) / bmp.bitmap.getWidth();
-        Bitmap newBitmap = Bitmap.createScaledBitmap(bmp.bitmap, width, height,
-                                                     false);
-        bmp.bitmap.recycle();
-        bmp.bitmap = newBitmap;
     }
 
 }
