@@ -1,5 +1,6 @@
 package tankery.app.family.photos.widget;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Random;
 
@@ -22,7 +23,7 @@ import android.widget.Toast;
  * The Waterfall view is a lazy vertical scroll view,
  * who contains an horizon linear child with several
  * WaterfallItemColumn to manage the items.
- * 
+ *
  * @author tankery
  *
  */
@@ -179,7 +180,15 @@ public class WaterfallView extends LazyVScrollView {
         });
     }
 
-    private final Handler waterfallErrorHandler = new Handler() {
+    private final WaterfallErrorHandler waterfallErrorHandler = new WaterfallErrorHandler(this);
+    private final static class WaterfallErrorHandler extends Handler {
+
+        private WeakReference<WaterfallView> mView;
+
+        WaterfallErrorHandler(WaterfallView view) {
+            mView = new WeakReference<WaterfallView>(view);
+        }
+
         @Override
         public void handleMessage(Message msg) {
             final WaterfallErrorType types[] = WaterfallErrorType.values();
@@ -190,10 +199,10 @@ public class WaterfallView extends LazyVScrollView {
             }
             switch (types[msg.what]) {
             case UNKNOW_ERROR:
-                showUserMessage((String) msg.obj);
+                mView.get().showUserMessage((String) msg.obj);
                 break;
             case PHOTO_FETCHING_TIMEOUT:
-                showUserMessage(R.string.app_err_connection_timeout);
+                mView.get().showUserMessage(R.string.app_err_connection_timeout);
                 break;
             default:
                 Log.e(tag, types[msg.what].name() + " is invalidate.");
@@ -202,7 +211,7 @@ public class WaterfallView extends LazyVScrollView {
             PhotoStorage storage = PhotoStorage.getInstance();
             storage.fetchMorePhotos(PHOTO_FETCHING_COUNT);
         }
-    };
+    }
 
     private final static Handler needAppendNewItemsHandler = new Handler() {
         @Override

@@ -1,8 +1,9 @@
 /**
- * 
+ *
  */
 package tankery.app.family.photos.widget;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 
 import tankery.app.family.photos.data.PhotoStorage;
@@ -62,82 +63,101 @@ public class WaterfallItemColumn extends LinearLayout {
         setLayoutParams(itemParam);
     }
 
-    private static final int MSG_CLEAR = 0;
+    private static final int MSG_CLEAR_VIEWS = 0;
     private static final int MSG_ADD_PHOTO = 1;
     private static final int MSG_SET_PHOTO = 2;
 
-    private final Handler handler = new Handler() {
+    private final Handler itemsChangeHandler = new ItemsChangeHandler(this);
+
+    private final static class ItemsChangeHandler extends Handler {
+
+        private WeakReference<WaterfallItemColumn> mColumn;
+
+        ItemsChangeHandler(WaterfallItemColumn column) {
+            mColumn = new WeakReference<WaterfallItemColumn>(column);
+        }
+
         @Override
         public void handleMessage(Message msg) {
-            int id;
-            Bitmap bmp = null;
             switch(msg.what) {
-            case MSG_CLEAR:
-                itemIdTable.clear();
-                removeAllViews();
+            case MSG_CLEAR_VIEWS:
+                mColumn.get().doClear();
                 break;
             case MSG_ADD_PHOTO:
-                id = (Integer) msg.arg1;
-                // get photo from photo table by id.
-                bmp = PhotoStorage.getInstance().getPhoto(id);
-                if (bmp == null) {
-                    Log.e(tag, "Bitmap [" + id + "] is null when addPhoto.");
-                    return;
-                }
-
-                // create item view and map current position to its id
-                WaterfallItem view = new WaterfallItem(getContext());
-                view.setPadding(0, 2, 0, 2);
-
-                int width = bmp.getWidth();
-                int height = bmp.getHeight();
-                int layoutHeight = (height * columnWidth) / width;
-                // The measured height must increase when adding a new item.
-                if (layoutHeight == 0)
-                    layoutHeight = 1;
-                LinearLayout.LayoutParams itemParam = new LinearLayout.LayoutParams(
-                        LayoutParams.MATCH_PARENT, layoutHeight);
-                view.setLayoutParams(itemParam);
-                view.setImageBitmap(id);
-
-                itemIdTable.append(getMeasuredHeight(), view);
-                view.setId(itemIdTable.size());
-
-                // at last, add it to item column.
-                addView(view);
+                mColumn.get().doAddPhoto(msg.arg1);
                 break;
             case MSG_SET_PHOTO:
-                WaterfallItem item = (WaterfallItem) findViewById(msg.arg2);
-                if (item == null) {
-                    Log.e(tag, "WaterfallItem [" + msg.arg2 + "] is null when setPhoto.");
-                    return;
-                }
-                // get photo from photo table by id.
-                bmp = PhotoStorage.getInstance().getPhoto(msg.arg1);
-                // set null bitmap is validate.
-                item.setImageBitmap(bmp);
+                mColumn.get().doSetPhoto(msg.arg1, msg.arg2);
+                break;
             default:
                 break;
             }
         }
-    };
+    }
 
     public void clear() {
-        handler.obtainMessage(MSG_CLEAR).sendToTarget();
+        itemsChangeHandler.obtainMessage(MSG_CLEAR_VIEWS).sendToTarget();
     }
 
     public void addPhoto(int id) {
-        handler.obtainMessage(MSG_ADD_PHOTO, id, 0).sendToTarget();
+        itemsChangeHandler.obtainMessage(MSG_ADD_PHOTO, id, 0).sendToTarget();
     }
 
     public void setPhoto(WaterfallItem item, int photoId) {
-        handler.obtainMessage(MSG_SET_PHOTO, photoId, item.getId()).sendToTarget();
+        itemsChangeHandler.obtainMessage(MSG_SET_PHOTO, photoId, item.getId()).sendToTarget();
+    }
+
+    private void doClear() {
+        itemIdTable.clear();
+        removeAllViews();
+    }
+
+    private void doAddPhoto(int id) {
+        // get photo from photo table by id.
+        Bitmap bmp = PhotoStorage.getInstance().getPhoto(id);
+        if (bmp == null) {
+            Log.e(tag, "Bitmap [" + id + "] is null when addPhoto.");
+            return;
+        }
+
+        // create item view and map current position to its id
+        WaterfallItem view = new WaterfallItem(getContext());
+        view.setPadding(0, 2, 0, 2);
+
+        int width = bmp.getWidth();
+        int height = bmp.getHeight();
+        int layoutHeight = (height * columnWidth) / width;
+        // The measured height must increase when adding a new item.
+        if (layoutHeight == 0)
+            layoutHeight = 1;
+        LinearLayout.LayoutParams itemParam = new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, layoutHeight);
+        view.setLayoutParams(itemParam);
+        view.setImageBitmap(id);
+
+        itemIdTable.append(getMeasuredHeight(), view);
+        view.setId(itemIdTable.size());
+
+        // at last, add it to item column.
+        addView(view);
+    }
+
+    private void doSetPhoto(int photoId, int itemId) {
+        WaterfallItem item = (WaterfallItem) findViewById(itemId);
+        if (item == null) {
+            Log.e(tag, "WaterfallItem [" + itemId + "] is null when setPhoto.");
+            return;
+        }
+        // get photo from photo table by id.
+        Bitmap bmp = PhotoStorage.getInstance().getPhoto(photoId);
+        // set null bitmap is validate.
+        item.setImageBitmap(bmp);
     }
 
     /**
      * the view port changed, we should recycle the view that far away from
      * viewport.
-     * 
+     *
      * FIXME: when scroll to the top or bottom of the column, some photos may
      * not been reloaded.
      * @param top the new scroll top of column
@@ -204,7 +224,7 @@ public class WaterfallItemColumn extends LinearLayout {
 
         /**
          * the position related to a line.
-         * 
+         *
          * @param index
          *            index of waterfall item in itemIdTable to compare
          * @param topLine

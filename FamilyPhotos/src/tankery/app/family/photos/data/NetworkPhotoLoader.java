@@ -6,13 +6,13 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.Queue;
 
 import tankery.app.family.photos.net.ResourceLoaderTask;
-
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -58,11 +58,11 @@ public class NetworkPhotoLoader implements PhotoLoader {
     private Context applicationContext = null;
     private ArrayList<String> tempPhotoFileList = null;
     private SparseArray<String> tempFileUrlTable = new SparseArray<String>();
-    
+
     private String fetchWebPhotoUrl = MYHOME_SERVER_URL +
                                       "?action=ls&act_para=/test_waterfall&";
     private Queue<String> urlRequests = new LinkedList<String>();
-    
+
     private ResourceLoadingType loadingType = ResourceLoadingType.NOT_START;
 
     public NetworkPhotoLoader() {
@@ -231,7 +231,16 @@ public class NetworkPhotoLoader implements PhotoLoader {
         }
     };
 
-    private Handler updateLoadingHandle = new Handler() {
+    private Handler updateLoadingHandle = new UpdateLoadingHandler(this);
+
+    private final static class UpdateLoadingHandler extends Handler {
+
+        private WeakReference<NetworkPhotoLoader> mLoader;
+
+        UpdateLoadingHandler(NetworkPhotoLoader loader) {
+            mLoader = new WeakReference<NetworkPhotoLoader>(loader);
+        }
+
         @Override
         public void handleMessage(Message msg) {
             final ResourceLoadingType types[] = ResourceLoadingType.values();
@@ -242,42 +251,52 @@ public class NetworkPhotoLoader implements PhotoLoader {
             }
             switch (types[msg.what]) {
             case NOT_START:
-                if (resourceLoaderTask != null)
-                    resourceLoaderTask.cancel(false);
+                mLoader.get().doCancelLoading();
                 break;
-            case WEB_PHOTO_LIST: {
-                resourceLoaderTask = new ResourceLoaderTask();
-                resourceLoaderTask.setResourceLoaderTaskListener(taskListener);
-                resourceLoaderTask.setStreamDecoder(photoListStreamDecoder);
-                resourceLoaderTask.execute(fetchWebPhotoUrl);
-                Log.d(tag, "start loading " + fetchWebPhotoUrl);
+            case WEB_PHOTO_LIST:
+                mLoader.get().doLoadingWebPhotoList();
                 break;
-            }
-            case PHOTO_CONTENT: {
-                int count = urlRequests.size();
-                if (count == 0)
-                    break;
-                String[] requests = new String[count];
-                for (int i = 0; i < count; i++) {
-                    requests[i] = urlRequests.poll();
-                }
-                resourceLoaderTask = new ResourceLoaderTask();
-                resourceLoaderTask.setResourceLoaderTaskListener(taskListener);
-                resourceLoaderTask.setStreamDecoder(bitmapStreamDecoder);
-                resourceLoaderTask.execute(requests);
-                Log.d(tag,
-                      "start loading [" + TextUtils.join(", ", requests) + "]");
+            case PHOTO_CONTENT:
+                mLoader.get().doLoadingPhotoContent();
                 break;
-            }
             default:
                 Log.e(tag, types[msg.what].name() + " is invalidate.");
                 break;
             }
         }
-    };
+    }
 
     private void updateLoading() {
         updateLoadingHandle.obtainMessage(loadingType.ordinal()).sendToTarget();
+    }
+
+    private void doCancelLoading() {
+        if (resourceLoaderTask != null)
+            resourceLoaderTask.cancel(false);
+    }
+
+    private void doLoadingWebPhotoList() {
+        resourceLoaderTask = new ResourceLoaderTask();
+        resourceLoaderTask.setResourceLoaderTaskListener(taskListener);
+        resourceLoaderTask.setStreamDecoder(photoListStreamDecoder);
+        resourceLoaderTask.execute(fetchWebPhotoUrl);
+        Log.d(tag, "start loading " + fetchWebPhotoUrl);
+    }
+
+    private void doLoadingPhotoContent() {
+        int count = urlRequests.size();
+        if (count == 0)
+            return;
+        String[] requests = new String[count];
+        for (int i = 0; i < count; i++) {
+            requests[i] = urlRequests.poll();
+        }
+        resourceLoaderTask = new ResourceLoaderTask();
+        resourceLoaderTask.setResourceLoaderTaskListener(taskListener);
+        resourceLoaderTask.setStreamDecoder(bitmapStreamDecoder);
+        resourceLoaderTask.execute(requests);
+        Log.d(tag,
+              "start loading [" + TextUtils.join(", ", requests) + "]");
     }
 
     private void saveBitmapToFileIfNeed(WebBitmap bmp) {
