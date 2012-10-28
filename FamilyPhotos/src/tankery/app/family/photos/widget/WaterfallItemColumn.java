@@ -5,6 +5,10 @@ package tankery.app.family.photos.widget;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.Queue;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import tankery.app.family.photos.data.PhotoStorage;
 import tankery.app.family.photos.utils.AlgorithmHelper;
@@ -36,6 +40,7 @@ public class WaterfallItemColumn extends LinearLayout {
      * table is the item top coordinate, and the value is the item id.
      */
     private SparseArray<WaterfallItem> itemIdTable = new SparseArray<WaterfallItem>();
+    Lock itemIdTableLock = new ReentrantLock();
 
     private int currentTop = 0;
 
@@ -108,7 +113,9 @@ public class WaterfallItemColumn extends LinearLayout {
     }
 
     private void doClear() {
+        itemIdTableLock.lock();
         itemIdTable.clear();
+        itemIdTableLock.unlock();
         removeAllViews();
     }
 
@@ -135,8 +142,13 @@ public class WaterfallItemColumn extends LinearLayout {
         view.setLayoutParams(itemParam);
         view.setImageBitmap(id);
 
+        // measure the layout before adding new photo.
+        measure(0, 0);
+
+        itemIdTableLock.lock();
         itemIdTable.append(getMeasuredHeight(), view);
         view.setId(itemIdTable.size());
+        itemIdTableLock.unlock();
 
         // at last, add it to item column.
         addView(view);
@@ -168,10 +180,8 @@ public class WaterfallItemColumn extends LinearLayout {
         if (top == currentTop || top < 0 || top > getMeasuredHeight())
             return;
 
-        // if the top is near to currentTop, and not near top or bottom, ignore it.
-        if (Math.abs(top - currentTop) < (height / 2) &&
-                top - 0 > (height / 2) &&
-                top + height < (getMeasuredHeight() - height / 2))
+        // if the top is near to currentTop, ignore it.
+        if (Math.abs(top - currentTop) < (height * RETAIN_AREA_HEIGHT_MUTIPLE / 4))
             return;
 
         // calculate the current/new retain area top and bottom.
@@ -179,15 +189,18 @@ public class WaterfallItemColumn extends LinearLayout {
         int rCurBottom = currentTop + height * RETAIN_AREA_HEIGHT_MUTIPLE;
         int rNewTop = top - height * (RETAIN_AREA_HEIGHT_MUTIPLE - 1);
         int rNewBottom = top + height * RETAIN_AREA_HEIGHT_MUTIPLE;
+
         // make them reasonable
-        if (rCurTop < 0)
-            rCurTop = 0;
-        if (rCurBottom > getMeasuredHeight())
-            rCurBottom = getMeasuredHeight();
-        if (rNewTop < 0)
-            rNewTop = 0;
-        if (rNewBottom > getMeasuredHeight())
-            rNewBottom = getMeasuredHeight();
+        int minTop = 0;
+        int maxBottom = getMeasuredHeight();
+        if (rCurTop < minTop)
+            rCurTop = minTop;
+        if (rCurBottom > maxBottom)
+            rCurBottom = maxBottom;
+        if (rNewTop < minTop)
+            rNewTop = minTop;
+        if (rNewBottom > maxBottom)
+            rNewBottom = maxBottom;
 
         // calculate the views need recycle and reload.
         ArrayList<WaterfallItem> itemsNeedReload = null;
@@ -196,15 +209,13 @@ public class WaterfallItemColumn extends LinearLayout {
             // viewport move down (scroll up).
             itemsNeedReload = getItemsInArea(Math.max(rCurBottom, rNewTop),
                                              rNewBottom);
-            itemsNeedRecycle = getItemsInArea(rCurTop,
-                                              Math.min(rCurBottom, rNewTop));
+            itemsNeedRecycle = getItemsInArea(rCurTop, rNewTop);
         }
         else {
             // viewport move up (scroll down).
             itemsNeedReload = getItemsInArea(rNewTop,
                                              Math.min(rNewBottom, rCurTop));
-            itemsNeedRecycle = getItemsInArea(Math.max(rNewBottom, rCurTop),
-                                              rCurBottom);
+            itemsNeedRecycle = getItemsInArea(rNewBottom, rCurBottom);
         }
 
         currentTop = top;
@@ -244,9 +255,9 @@ public class WaterfallItemColumn extends LinearLayout {
                     itemIdTable.keyAt(index + 1);
             int itemTop = itemIdTable.keyAt(index);
 
-            if (nextItemTop <= topLine)
+            if (nextItemTop < topLine)
                 return -1;
-            else if (itemTop <= topLine && nextItemTop > topLine)
+            else if (itemTop < topLine && nextItemTop >= topLine)
                 return 0;
             else
                 return 1;
@@ -254,36 +265,52 @@ public class WaterfallItemColumn extends LinearLayout {
     };
 
     private ArrayList<WaterfallItem> getItemsInArea(int top, int bottom) {
-        int[] indexes =
-                AlgorithmHelper.binaryFindBetween(0,
-                                                  itemIdTable.size(),
-                                                  top, bottom,
-                                                  positionToLineComparetor);
+        itemIdTableLock.lock();
+        try {
+            int[] indexes =
+                    AlgorithmHelper.binaryFindBetween(0,
+                                                      itemIdTable.size(),
+                                                      top, bottom,
+                                                      positionToLineComparetor);
 
-        if (indexes == null)
-            return null;
+            if (indexes == null)
+                return null;
 
-        ArrayList<WaterfallItem> result =
-                new ArrayList<WaterfallItem>(indexes[1] - indexes[0]);
-        for (int i = indexes[0]; i < indexes[1]; i++) {
-            result.add(itemIdTable.valueAt(i));
+            ArrayList<WaterfallItem> result =
+                    new ArrayList<WaterfallItem>(indexes[1] - indexes[0]);
+            for (int i = indexes[0]; i < indexes[1]; i++) {
+                result.add(itemIdTable.valueAt(i));
+            }
+
+            return result;
         }
-
-        return result;
+        finally {
+            itemIdTableLock.unlock();
+        }
     }
 
-    private class ItemsReloadTask extends AsyncTask<WaterfallItem, Object, Object> {
-        @Override
-        protected Object doInBackground(WaterfallItem... items) {
-            for (WaterfallItem item : items) {
-                item.reload();
+    private Queue<WaterfallItem> dirtyItemsList = new LinkedList<WaterfallItem>();
 
-                if (isCancelled())
-                    break;
+    private class ItemsReloadRecycleTask extends AsyncTask<Object, Object, Object> {
+        @Override
+        protected Object doInBackground(Object... obj) {
+            while (dirtyItemsList.size() > 0) {
+                WaterfallItem item = dirtyItemsList.poll();
+                if (item.needRecycle())
+                    item.recycle();
+                else if (item.needReload())
+                    item.reload();
             }
             return null;
         }
+
+        @Override
+        protected void onPostExecute(Object obj) {
+            itemsReloadRecycleTask = null;
+        }
     }
+
+    private ItemsReloadRecycleTask itemsReloadRecycleTask = null;
 
     private void reloadItems(final ArrayList<WaterfallItem> itemsNeedReload) {
         if (itemsNeedReload == null || itemsNeedReload.isEmpty())
@@ -291,10 +318,16 @@ public class WaterfallItemColumn extends LinearLayout {
 
         Log.d(tag, "reload items: " + itemsNeedReload.toString());
 
-        WaterfallItem[] items = new WaterfallItem[itemsNeedReload.size()];
-        itemsNeedReload.toArray(items);
-        ItemsReloadTask itemsReloadTask = new ItemsReloadTask();
-        itemsReloadTask.execute(items);
+        for (WaterfallItem view : itemsNeedReload) {
+            view.reloadIfNeed();
+            if (!dirtyItemsList.contains(view))
+                dirtyItemsList.add(view);
+        }
+
+        if (itemsReloadRecycleTask == null) {
+            itemsReloadRecycleTask = new ItemsReloadRecycleTask();
+            itemsReloadRecycleTask.execute();
+        }
     }
 
     private void recycleItems(final ArrayList<WaterfallItem> itemsNeedRecycle) {
@@ -304,9 +337,15 @@ public class WaterfallItemColumn extends LinearLayout {
         Log.d(tag, "recycle items: " + itemsNeedRecycle.toString());
 
         for (WaterfallItem view : itemsNeedRecycle) {
-            view.recycle();
+            view.recycleIfNeed();
+            if (!dirtyItemsList.contains(view))
+                dirtyItemsList.add(view);
         }
 
+        if (itemsReloadRecycleTask == null) {
+            itemsReloadRecycleTask = new ItemsReloadRecycleTask();
+            itemsReloadRecycleTask.execute();
+        }
     }
 
 }
