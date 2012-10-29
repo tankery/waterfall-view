@@ -3,14 +3,14 @@ package tankery.app.family.photos.utils;
 public final class AlgorithmHelper {
     /**
      * interface for search compare.
-     * 
+     *
      * @author tankery
-     * 
+     *
      */
     public interface Comparetor<T> {
         /**
          * algorithm will pass the obj1 to compare with the obj2.
-         * 
+         *
          * @param index
          *            the index of object in list.
          * @param target
@@ -76,8 +76,6 @@ public final class AlgorithmHelper {
                     e = m - 1;
                 }
             }
-            if (s > e)
-                return null; // not found.
         }
 
         // if item on last not found, find it
@@ -97,13 +95,27 @@ public final class AlgorithmHelper {
                     e = m - 1;
                 }
             }
-            if (s > e)
-                return null; // not found.
         }
 
         // one item on first and last at the same time, treat as not found.
         if (firstItemIndex == lastItemIndex)
             return null;
+
+        // last item index found, but first not, means the first is out of range
+        if (firstItemIndex == -1) {
+            if (lastItemIndex > begin)
+                firstItemIndex = begin;
+            else
+                return null;
+        }
+
+        // first item index found, but last not, means the last is out of range
+        if (lastItemIndex == -1) {
+            if (firstItemIndex < end)
+                lastItemIndex = end;
+            else
+                return null;
+        }
 
         int[] ret = { firstItemIndex, lastItemIndex };
 

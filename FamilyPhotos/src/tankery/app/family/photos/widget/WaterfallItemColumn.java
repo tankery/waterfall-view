@@ -146,8 +146,8 @@ public class WaterfallItemColumn extends LinearLayout {
         measure(0, 0);
 
         itemIdTableLock.lock();
-        itemIdTable.append(getMeasuredHeight(), view);
         view.setId(itemIdTable.size());
+        itemIdTable.append(getMeasuredHeight(), view);
         itemIdTableLock.unlock();
 
         // at last, add it to item column.
@@ -170,8 +170,6 @@ public class WaterfallItemColumn extends LinearLayout {
      * the view port changed, we should recycle the view that far away from
      * viewport.
      *
-     * FIXME: when scroll to the top or bottom of the column, some photos may
-     * not been reloaded.
      * @param top the new scroll top of column
      * @param height the parent visible height
      */
@@ -192,7 +190,8 @@ public class WaterfallItemColumn extends LinearLayout {
 
         // make them reasonable
         int minTop = 0;
-        int maxBottom = getMeasuredHeight();
+        // max bottom must lager than last item's bottom, so, do a plus 1.
+        int maxBottom = getMeasuredHeight() + 1;
         if (rCurTop < minTop)
             rCurTop = minTop;
         if (rCurBottom > maxBottom)
