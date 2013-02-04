@@ -289,17 +289,22 @@ public class WaterfallItemColumn extends LinearLayout {
     }
 
     private Queue<WaterfallItem> dirtyItemsList = new LinkedList<WaterfallItem>();
+    Lock dirtyItemsListLock = new ReentrantLock();
 
     private class ItemsReloadRecycleTask extends AsyncTask<Object, Object, Object> {
         @Override
         protected Object doInBackground(Object... obj) {
+            Log.d(tag, "new task.");
             while (dirtyItemsList.size() > 0) {
+                dirtyItemsListLock.lock();
                 WaterfallItem item = dirtyItemsList.poll();
+                dirtyItemsListLock.unlock();
                 if (item.needRecycle())
                     item.recycle();
                 else if (item.needReload())
                     item.reload();
             }
+            Log.d(tag, "end task.");
             return null;
         }
 
@@ -319,8 +324,11 @@ public class WaterfallItemColumn extends LinearLayout {
 
         for (WaterfallItem view : itemsNeedReload) {
             view.reloadIfNeed();
-            if (!dirtyItemsList.contains(view))
+            if (!dirtyItemsList.contains(view)) {
+                dirtyItemsListLock.lock();
                 dirtyItemsList.add(view);
+                dirtyItemsListLock.unlock();
+            }
         }
 
         if (itemsReloadRecycleTask == null) {
@@ -337,8 +345,11 @@ public class WaterfallItemColumn extends LinearLayout {
 
         for (WaterfallItem view : itemsNeedRecycle) {
             view.recycleIfNeed();
-            if (!dirtyItemsList.contains(view))
+            if (!dirtyItemsList.contains(view)) {
+                dirtyItemsListLock.lock();
                 dirtyItemsList.add(view);
+                dirtyItemsListLock.unlock();
+            }
         }
 
         if (itemsReloadRecycleTask == null) {

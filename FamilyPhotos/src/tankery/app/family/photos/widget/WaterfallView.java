@@ -7,7 +7,7 @@ import java.util.Random;
 import tankery.app.family.photos.data.PhotoStorage;
 import tankery.app.family.photos.data.PhotoStorage.PhotoStorageError;
 import tankery.app.family.photos.data.PhotoStorage.PhotoStorageListener;
-import tankery.app.familyphotos.R;
+import tankery.app.family.photos.R;
 
 import android.content.Context;
 import android.graphics.Color;

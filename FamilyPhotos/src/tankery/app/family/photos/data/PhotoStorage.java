@@ -53,6 +53,7 @@ public class PhotoStorage {
             public void onReceivedPhotoList(String[] list) {
                 if (list == null || list.length == 0) {
                     Log.e(tag, "PhotoStorage: web photo list is empty");
+                    return;
                 }
                 photoListOnWeb = new ArrayList<String>(Arrays.asList(list));
                 photoStorageListener.onListFetchingFinished();

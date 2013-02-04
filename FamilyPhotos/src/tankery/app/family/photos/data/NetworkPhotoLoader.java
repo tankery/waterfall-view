@@ -132,7 +132,7 @@ public class NetworkPhotoLoader implements PhotoLoader {
         updateLoading();
     }
 
-    private ResourceLoaderTask resourceLoaderTask;
+    private ResourceLoaderTask resourceLoaderTask = new ResourceLoaderTask();;
 
     private ResourceLoaderTask.ResourceLoaderTaskListener taskListener =
             new ResourceLoaderTask.ResourceLoaderTaskListener() {
@@ -185,7 +185,7 @@ public class NetworkPhotoLoader implements PhotoLoader {
             if (mabeFilename != null) {
                 url = tempFileUrlTable.get(Integer.parseInt(mabeFilename));
             }
-            return new WebBitmap(url, bmp);
+            return new WebBitmap(shortUrl(url), bmp);
         }
 
         private Bitmap decodeStream(InputStream is, boolean compress) {
@@ -271,12 +271,10 @@ public class NetworkPhotoLoader implements PhotoLoader {
     }
 
     private void doCancelLoading() {
-        if (resourceLoaderTask != null)
-            resourceLoaderTask.cancel(false);
+        resourceLoaderTask.cancel(false);
     }
 
     private void doLoadingWebPhotoList() {
-        resourceLoaderTask = new ResourceLoaderTask();
         resourceLoaderTask.setResourceLoaderTaskListener(taskListener);
         resourceLoaderTask.setStreamDecoder(photoListStreamDecoder);
         resourceLoaderTask.execute(fetchWebPhotoUrl);
@@ -291,7 +289,6 @@ public class NetworkPhotoLoader implements PhotoLoader {
         for (int i = 0; i < count; i++) {
             requests[i] = urlRequests.poll();
         }
-        resourceLoaderTask = new ResourceLoaderTask();
         resourceLoaderTask.setResourceLoaderTaskListener(taskListener);
         resourceLoaderTask.setStreamDecoder(bitmapStreamDecoder);
         resourceLoaderTask.execute(requests);

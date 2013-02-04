@@ -1,4 +1,4 @@
-package tankery.app.familyphotos;
+package tankery.app.family.photos;
 
 import tankery.app.family.photos.widget.WaterfallView;
 import android.os.Bundle;

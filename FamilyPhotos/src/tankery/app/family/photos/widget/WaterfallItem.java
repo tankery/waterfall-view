@@ -77,6 +77,7 @@ public class WaterfallItem extends ImageView {
     }
 
     public void reload() {
+        Log.d(tag, "reload " + toString());
         if (photoId == 0)
             return;
 
@@ -112,6 +113,7 @@ public class WaterfallItem extends ImageView {
     }
 
     public void recycle() {
+        Log.d(tag, "recycle " + toString());
         // set the bitmap in PhotoStorage will cause the old one
         // recycle.
         PhotoStorage.getInstance().setPhoto(photoId, null);
