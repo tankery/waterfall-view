@@ -63,7 +63,6 @@ public class WaterfallView extends LazyVScrollView {
 
     public void init() {
         initLayout();
-        initEvent();
         PhotoStorage storage = PhotoStorage.getInstance();
         storage.setPhotoCompressedWidth(columnWidth);
         storage.setUseTempPhotoFile(getContext());
@@ -145,39 +144,34 @@ public class WaterfallView extends LazyVScrollView {
         }
     }
 
-    private void initEvent() {
-        setOnScrollListener(new OnScrollListener() {
-
-            @Override
-            public void onTopReached() {
-                Log.d(tag, "Scrolled to top");
-                showUserMessage(R.string.waterfall_refresh);
-                PhotoStorage.getInstance().refreshPhotoList();
-                for (WaterfallItemColumn column : itemColumns) {
-                    column.clear();
-                }
+    @Override
+    protected void onVScrollChanged(int t, int oldt) {
+        if (t != oldt) {
+            for (WaterfallItemColumn col : itemColumns) {
+                col.updateViewport(t, getMeasuredHeight());
             }
+        }
+    }
 
-            @Override
-            public void onBottomReached() {
-                Log.d(tag, "Scrolled to bottom");
-                showUserMessage(R.string.waterfall_adding_item);
-                needAppendNewItems();
-            }
+    @Override
+    public void onTopReached() {
+        Log.d(tag, "Scrolled to top");
+        showUserMessage(R.string.waterfall_refresh);
+        PhotoStorage.getInstance().refreshPhotoList();
+        for (WaterfallItemColumn column : itemColumns) {
+            column.clear();
+        }
+    }
 
-            @Override
-            public void onScrolling() {
-            }
+    @Override
+    public void onBottomReached() {
+        Log.d(tag, "Scrolled to bottom");
+        showUserMessage(R.string.waterfall_adding_item);
+        needAppendNewItems();
+    }
 
-            @Override
-            public void onScrollChanged(int t, int oldt) {
-                if (t != oldt) {
-                    for (WaterfallItemColumn col : itemColumns) {
-                        col.updateViewport(t, getMeasuredHeight());
-                    }
-                }
-            }
-        });
+    @Override
+    public void onScrolling() {
     }
 
     private final WaterfallErrorHandler waterfallErrorHandler = new WaterfallErrorHandler(this);
@@ -213,17 +207,10 @@ public class WaterfallView extends LazyVScrollView {
         }
     }
 
-    private final static Handler needAppendNewItemsHandler = new Handler() {
-        @Override
-        public void handleMessage(Message msg) {
-            PhotoStorage storage = PhotoStorage.getInstance();
-            storage.fetchMorePhotos(PHOTO_FETCHING_COUNT);
-        }
-    };
-
+    // Note this function can only calling in UI thread.
     private void needAppendNewItems() {
-        needAppendNewItemsHandler.sendMessageDelayed(needAppendNewItemsHandler.obtainMessage(),
-                                                     200);
+        PhotoStorage storage = PhotoStorage.getInstance();
+        storage.fetchMorePhotos(PHOTO_FETCHING_COUNT);
     }
 
     private void doAppendNewItems(ArrayList<Integer> updatedIdList) {
