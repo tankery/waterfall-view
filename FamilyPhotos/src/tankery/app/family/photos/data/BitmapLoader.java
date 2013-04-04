@@ -103,9 +103,7 @@ public class BitmapLoader {
             if (bmp == null || bmp.isRecycled()) {
                 String name = String.valueOf(photoId);
                 try {
-                    FileInputStream fis =
-                            mLoader.get().getContext().getApplicationContext()
-                                        .openFileInput(name);
+                    FileInputStream fis = getFileInputStream(name);
                     final Bitmap newBmp = BitmapFactory.decodeStream(fis);
                     if (newBmp == null || newBmp.getWidth() <= 0 ||
                         newBmp.getHeight() <= 0) {
@@ -133,6 +131,14 @@ public class BitmapLoader {
             // recycle.
             int photoId = PhotoStorage.generateId(key);
             PhotoStorage.getInstance().setPhoto(photoId, null);
+        }
+
+        // TODO: this really shouldn't be here!! Refactor, refactor, refactor....
+        private FileInputStream getFileInputStream(String name) throws FileNotFoundException {
+            return new FileInputStream(mLoader.get()
+                                .getContext()
+                                .getApplicationContext()
+                                .getCacheDir() + "/" + name);
         }
     }
 

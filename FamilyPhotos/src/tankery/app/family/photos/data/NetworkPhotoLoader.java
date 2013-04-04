@@ -1,6 +1,7 @@
 package tankery.app.family.photos.data;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -38,6 +39,8 @@ public class NetworkPhotoLoader implements PhotoLoader {
 
     private static final String HOST_ADDRESS = "http://192.168.0.211";
     private static final String MYHOME_SERVER_URL = HOST_ADDRESS + "/myhome/";
+
+    private static final String TEMP_FILE_PATH = "";
 
     public enum ResourceLoadingError {
         UNKNOW_ERROR,
@@ -85,7 +88,7 @@ public class NetworkPhotoLoader implements PhotoLoader {
             return;
         applicationContext = appContext;
         tempPhotoFileList =
-                new ArrayList<String>(Arrays.asList(applicationContext.fileList()));
+                new ArrayList<String>(Arrays.asList(new File(getTempFileDir()).list()));
     }
 
     /* (non-Javadoc)
@@ -139,7 +142,7 @@ public class NetworkPhotoLoader implements PhotoLoader {
         }
     }
 
-    private ResourceLoaderTask resourceLoaderTask = new ResourceLoaderTask();;
+    private ResourceLoaderTask resourceLoaderTask = new ResourceLoaderTask();
 
     private ResourceLoaderTask.ResourceLoaderTaskListener taskListener =
             new ResourceLoaderTask.ResourceLoaderTaskListener() {
@@ -303,6 +306,7 @@ public class NetworkPhotoLoader implements PhotoLoader {
               "start loading [" + TextUtils.join(", ", requests) + "]");
     }
 
+    // TODO: the IO operation shouldn't be execute at UI thread, need refactor.
     private void saveBitmapToFileIfNeed(WebBitmap bmp) {
         if (tempPhotoFileList == null)
             return;
@@ -313,8 +317,8 @@ public class NetworkPhotoLoader implements PhotoLoader {
             tempPhotoFileList.add(filename);
             FileOutputStream fos;
             try {
-                fos = applicationContext.openFileOutput(filename,
-                                                        Context.MODE_PRIVATE);
+                File outputFile = new File(generateTempFilePath(filename));
+                fos = new FileOutputStream(outputFile);
                 bmp.bitmap.compress(Bitmap.CompressFormat.PNG,
                                     90, fos);
                 fos.close();
@@ -348,12 +352,20 @@ public class NetworkPhotoLoader implements PhotoLoader {
         return String.valueOf(shortUrl(url).hashCode());
     }
 
+    private String getTempFileDir() {
+        return applicationContext.getCacheDir() + "/" + TEMP_FILE_PATH;
+    }
+
+    private String generateTempFilePath(String filename) {
+        return getTempFileDir() + filename;
+    }
+
     private String generateTempFileUrl(String filename) {
-        return "file://" + applicationContext.getFilesDir() + "/" + filename;
+        return "file://" + generateTempFilePath(filename);
     }
 
     private String parseTempFileUrl(String url) {
-        String prefix = "file://" + applicationContext.getFilesDir() + "/";
+        String prefix = "file://" + getTempFileDir();
         return url.contains(prefix) ? url.substring(prefix.length()) : null;
     }
 
