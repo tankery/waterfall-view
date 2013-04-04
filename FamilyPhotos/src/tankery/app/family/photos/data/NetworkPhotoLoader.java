@@ -13,13 +13,13 @@ import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.Queue;
 
-import tankery.app.family.photos.net.ResourceLoaderTask;
+import tankery.app.family.photos.net.WebResourceLoader;
+import tankery.app.family.photos.net.WebResourceLoader.NetworkError;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Handler;
 import android.os.Message;
-import android.text.TextUtils;
 import android.util.Log;
 import android.util.SparseArray;
 
@@ -127,8 +127,9 @@ public class NetworkPhotoLoader implements PhotoLoader {
      */
     @Override
     public void stopLoading() {
+        mWebResourceLoader.stopLoading();
+        urlRequests.clear();
         loadingType = ResourceLoadingType.NOT_START;
-        updateLoading();
     }
 
     private void ensureLoadRequest() {
@@ -142,15 +143,17 @@ public class NetworkPhotoLoader implements PhotoLoader {
         }
     }
 
-    private ResourceLoaderTask resourceLoaderTask = new ResourceLoaderTask();
+    private WebResourceLoader mWebResourceLoader = new WebResourceLoader();
 
-    private ResourceLoaderTask.ResourceLoaderTaskListener taskListener =
-            new ResourceLoaderTask.ResourceLoaderTaskListener() {
+    private WebResourceLoader.WebResourceCallback mWebResourceCallback =
+            new WebResourceLoader.WebResourceCallback() {
 
                 @Override
-                public void onResourceReceived(Object obj) {
-                    if (obj == null)
+                public void onResourceReceived(String url, Object obj) {
+                    if (obj == null) {
+                        receivedResponse(url);
                         return;
+                    }
                     if (obj instanceof WebBitmap) {
                         WebBitmap bmp = (WebBitmap) obj;
                         photoLoaderListener.onReceivedPhoto(bmp);
@@ -160,26 +163,45 @@ public class NetworkPhotoLoader implements PhotoLoader {
                         String result = (String) obj;
                         String[] list = result.isEmpty() ? null : result.split(";");
                         photoLoaderListener.onReceivedPhotoList(list);
+                        finishedLoading();
+                    }
+                    receivedResponse(url);
+                }
+
+                @Override
+                public void onError(String url, NetworkError error) {
+                    if (error == NetworkError.CONNECTION_TIMEOUT) {
+                        stopLoading();
+                        photoLoaderListener.onErrorOccurred(ResourceLoadingError.HTTP_CONNETION_TIMEOUT,
+                                                            url);
+                        loadingType = ResourceLoadingType.NOT_START;
+                    }
+                    else {
+                        receivedResponse(url);
                     }
                 }
 
-                @Override
-                public void onFinished(int count) {
-                    if (loadingType == ResourceLoadingType.PHOTO_CONTENT)
-                        photoLoaderListener.onFinishedPhotoFetching();
-                    loadingType = ResourceLoadingType.NOT_START;
-                    ensureLoadRequest();
+                private void receivedResponse(String url) {
+                    urlRequests.remove(url);
+                    // if finished requests.
+                    if (urlRequests.isEmpty()) {
+                        finishedLoading();
+                    }
                 }
 
-                @Override
-                public void onConnectionTimeout() {
-                    stopLoading();
-                    photoLoaderListener.onErrorOccurred(ResourceLoadingError.HTTP_CONNETION_TIMEOUT,
-                                                          "");
+                private void finishedLoading() {
+                    if (loadingType == ResourceLoadingType.PHOTO_CONTENT) {
+                        loadingType = ResourceLoadingType.NOT_START;
+                        photoLoaderListener.onFinishedPhotoFetching();
+                    }
+                    else if (loadingType == ResourceLoadingType.WEB_PHOTO_LIST) {
+                        loadingType = ResourceLoadingType.NOT_START;
+                        ensureLoadRequest();
+                    }
                 }
             };
 
-    private ResourceLoaderTask.StreamDecoder bitmapStreamDecoder = new ResourceLoaderTask.StreamDecoder() {
+    private WebResourceLoader.StreamDecoder bitmapStreamDecoder = new WebResourceLoader.StreamDecoder() {
 
         @Override
         public Object decodeFromStream(String url, InputStream is) {
@@ -220,7 +242,7 @@ public class NetworkPhotoLoader implements PhotoLoader {
         }
     };
 
-    private ResourceLoaderTask.StreamDecoder photoListStreamDecoder = new ResourceLoaderTask.StreamDecoder() {
+    private WebResourceLoader.StreamDecoder photoListStreamDecoder = new WebResourceLoader.StreamDecoder() {
 
         @Override
         public Object decodeFromStream(String url, InputStream is) {
@@ -261,7 +283,7 @@ public class NetworkPhotoLoader implements PhotoLoader {
             }
             switch (types[msg.what]) {
             case NOT_START:
-                mLoader.get().doCancelLoading();
+                mLoader.get().stopLoading();
                 break;
             case WEB_PHOTO_LIST:
                 mLoader.get().doLoadingWebPhotoList();
@@ -280,30 +302,23 @@ public class NetworkPhotoLoader implements PhotoLoader {
         updateLoadingHandle.obtainMessage(loadingType.ordinal()).sendToTarget();
     }
 
-    private void doCancelLoading() {
-        resourceLoaderTask.cancel(false);
-    }
-
     private void doLoadingWebPhotoList() {
-        resourceLoaderTask.setResourceLoaderTaskListener(taskListener);
-        resourceLoaderTask.setStreamDecoder(photoListStreamDecoder);
-        resourceLoaderTask.execute(fetchWebPhotoUrl);
-        Log.d(tag, "start loading " + fetchWebPhotoUrl);
+        mWebResourceLoader.addResourceLoadRequest(fetchWebPhotoUrl,
+                                                  mWebResourceCallback,
+                                                  photoListStreamDecoder);
+        Log.d(tag, "schedule loading " + fetchWebPhotoUrl);
     }
 
     private void doLoadingPhotoContent() {
-        int count = urlRequests.size();
-        if (count == 0)
+        if (urlRequests.size() == 0)
             return;
-        String[] requests = new String[count];
-        for (int i = 0; i < count; i++) {
-            requests[i] = urlRequests.poll();
+        for (String url : urlRequests) {
+            mWebResourceLoader.addResourceLoadRequest(url,
+                                                      mWebResourceCallback,
+                                                      bitmapStreamDecoder);
+            Log.d(tag,
+                  "schedule loading " + url);
         }
-        resourceLoaderTask.setResourceLoaderTaskListener(taskListener);
-        resourceLoaderTask.setStreamDecoder(bitmapStreamDecoder);
-        resourceLoaderTask.execute(requests);
-        Log.d(tag,
-              "start loading [" + TextUtils.join(", ", requests) + "]");
     }
 
     // TODO: the IO operation shouldn't be execute at UI thread, need refactor.

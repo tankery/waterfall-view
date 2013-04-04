@@ -46,6 +46,11 @@ public abstract class CachedBitmap {
         mHolder = holder;
     }
 
+    public void clearBitmapIfNotUse() {
+        if (!isInUse())
+            mBitmap = null;
+    }
+
     protected void updateBitmap(Bitmap bmp) {
         mBitmap = bmp;
         if (mHolder != null && mInUse) {

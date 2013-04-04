@@ -1,15 +1,15 @@
 package tankery.app.family.photos.data;
 
-import tankery.app.family.photos.data.BitmapLoader.BitmapLoaderListener;
+import tankery.app.family.photos.data.BitmapLoader.BitmapReceivedCallback;
 import android.graphics.Bitmap;
 
 
-public class CachedWebBitmap extends CachedBitmap
-                             implements BitmapLoaderListener {
+public class CachedPhoto extends CachedBitmap
+                             implements BitmapReceivedCallback {
 
     private BitmapLoader mLoader;
 
-    public CachedWebBitmap(BitmapLoader loader, String key) {
+    public CachedPhoto(BitmapLoader loader, String key) {
         super(key);
         mLoader = loader;
     }
@@ -20,7 +20,7 @@ public class CachedWebBitmap extends CachedBitmap
      * @param loader
      * @param key
      */
-    public CachedWebBitmap(Bitmap initBmp, BitmapLoader loader, String key) {
+    public CachedPhoto(Bitmap initBmp, BitmapLoader loader, String key) {
         this(loader, key);
 
         super.setInUse(true);
@@ -48,12 +48,13 @@ public class CachedWebBitmap extends CachedBitmap
     }
 
     public void recycle() {
+        clearBitmapIfNotUse();
         mLoader.recycle(getKey());
     }
 
 
     /**************************************************
-     * BitmapLoaderListener Implements
+     * BitmapReceivedCallback Implements
      **************************************************/
 
     @Override

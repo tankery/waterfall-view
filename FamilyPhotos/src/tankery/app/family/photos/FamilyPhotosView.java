@@ -5,7 +5,7 @@ import java.util.ArrayList;
 
 import tankery.app.family.photos.R;
 import tankery.app.family.photos.data.CachedBitmap;
-import tankery.app.family.photos.data.CachedWebBitmap;
+import tankery.app.family.photos.data.CachedPhoto;
 import tankery.app.family.photos.data.PhotoStorage;
 import tankery.app.family.photos.data.PhotoStorage.PhotoStorageError;
 import tankery.app.family.photos.data.PhotoStorage.PhotoStorageListener;
@@ -97,8 +97,6 @@ public class FamilyPhotosView extends WaterfallView
                 Log.e(LOGTAG, types[msg.what].name() + " is invalidate.");
                 break;
             }
-            PhotoStorage storage = PhotoStorage.getInstance();
-            storage.fetchMorePhotos(PHOTO_FETCHING_COUNT);
         }
     }
 
@@ -155,7 +153,7 @@ public class FamilyPhotosView extends WaterfallView
         // FIXME: should refactor this part, we should delay load the bitmap.
         Bitmap bmp = PhotoStorage.getInstance()
                 .getPhoto(PhotoStorage.generateId(key));
-        CachedWebBitmap cbmp = new CachedWebBitmap(bmp, mBitmapLoader, key);
+        CachedPhoto cbmp = new CachedPhoto(bmp, mBitmapLoader, key);
         list.add(cbmp);
         super.appendNewBitmaps(list);
     }

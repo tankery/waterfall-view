@@ -70,7 +70,6 @@ public class PhotoStorage {
                     if (bmp.bitmap != null &&
                         !bmp.bitmap.isRecycled() &&
                         bmp.bitmap != wbmp.bitmap) {
-                        bmp.bitmap.recycle();
                         bmp.bitmap = null;
                     }
                     bmp = wbmp;
@@ -167,8 +166,6 @@ public class PhotoStorage {
         if (wbmp == null || wbmp.bitmap == bmp)
             return;
         photoTableLock.lock();
-        if (wbmp.bitmap != null && !wbmp.bitmap.isRecycled())
-            wbmp.bitmap.recycle();
         wbmp.bitmap = bmp;
         photoTableLock.unlock();
     }

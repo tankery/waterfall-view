@@ -24,7 +24,7 @@ public class BitmapLoader {
 
     static final String tag = "BitmapLoader";
 
-    public interface BitmapLoaderListener {
+    public interface BitmapReceivedCallback {
         void onBitmapRecieved(Bitmap bmp);
     }
 
@@ -35,7 +35,7 @@ public class BitmapLoader {
 
 
     private Context mApplicationContext = null;
-    private HashMap<String, BitmapLoaderListener> mListenerMap;
+    private HashMap<String, BitmapReceivedCallback> mListenerMap;
 
     private LoadRecycleHandler mLoadRecycleHandler;
     private UiTaskHandler mUiTaskHandler;
@@ -43,7 +43,7 @@ public class BitmapLoader {
 
     public BitmapLoader(Context appContext) {
         mApplicationContext = appContext;
-        mListenerMap = new HashMap<String, BitmapLoaderListener>();
+        mListenerMap = new HashMap<String, BitmapReceivedCallback>();
 
         // Create handler in an seperate thread.
         new Thread("LoadRecycleThread") {
@@ -61,7 +61,7 @@ public class BitmapLoader {
         return mApplicationContext;
     }
 
-    public void startLoading(String urlStr, BitmapLoaderListener listener) {
+    public void startLoading(String urlStr, BitmapReceivedCallback listener) {
         mListenerMap.put(urlStr, listener);
         reload(urlStr);
     }
