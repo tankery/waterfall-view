@@ -105,11 +105,7 @@ public class NetworkPhotoLoader implements PhotoLoader {
         // add the url string to load queue,
         urlRequests.add(urlStr);
 
-        // and start loading.
-        if (loadingType == ResourceLoadingType.NOT_START) {
-            loadingType = ResourceLoadingType.PHOTO_CONTENT;
-            updateLoading();
-        }
+        ensureLoadRequest();
     }
 
     /* (non-Javadoc)
@@ -130,6 +126,17 @@ public class NetworkPhotoLoader implements PhotoLoader {
     public void stopLoading() {
         loadingType = ResourceLoadingType.NOT_START;
         updateLoading();
+    }
+
+    private void ensureLoadRequest() {
+        if (urlRequests.isEmpty())
+            return;
+
+        // and start loading.
+        if (loadingType == ResourceLoadingType.NOT_START) {
+            loadingType = ResourceLoadingType.PHOTO_CONTENT;
+            updateLoading();
+        }
     }
 
     private ResourceLoaderTask resourceLoaderTask = new ResourceLoaderTask();;
@@ -158,6 +165,7 @@ public class NetworkPhotoLoader implements PhotoLoader {
                     if (loadingType == ResourceLoadingType.PHOTO_CONTENT)
                         photoLoaderListener.onFinishedPhotoFetching();
                     loadingType = ResourceLoadingType.NOT_START;
+                    ensureLoadRequest();
                 }
 
                 @Override
@@ -203,7 +211,6 @@ public class NetworkPhotoLoader implements PhotoLoader {
                 Bitmap newBitmap = Bitmap.createScaledBitmap(bmp, width,
                                                              height,
                                                              false);
-                bmp.recycle();
                 bmp = newBitmap;
             }
             return bmp;

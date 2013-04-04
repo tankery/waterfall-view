@@ -14,9 +14,8 @@ import android.widget.ScrollView;
  */
 public class LazyVScrollView extends ScrollView {
 
-    private static final String tag = "LazyVScrollView";
+    static final String LOGTAG = "LazyVScrollView";
 
-    private static final int SCROLLING_MESSAGE_DELAY = 200;
     private static final int CONTENT_LOAD_THRESHOLD_HEIGHT = 20;
 
     private View child = null;
@@ -33,7 +32,7 @@ public class LazyVScrollView extends ScrollView {
         super(context, attrs, defStyle);
     }
 
-    public boolean init(View child) {
+    public boolean setChild(View child) {
         if (child != null) {
             this.addView(child);
         }

@@ -1,6 +1,5 @@
 package tankery.app.family.photos;
 
-import tankery.app.family.photos.widget.WaterfallView;
 import android.os.Bundle;
 import android.app.Activity;
 import android.view.Menu;
@@ -12,7 +11,7 @@ public class HomeActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
 
-        WaterfallView view = (WaterfallView) findViewById(R.id.home_waterfall_view);
+        FamilyPhotosView view = (FamilyPhotosView) findViewById(R.id.family_photos_view);
         view.init();
     }
 

@@ -3,8 +3,8 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent" >
 
-    <tankery.app.family.photos.widget.WaterfallView
-        android:id="@+id/home_waterfall_view"
+    <tankery.app.family.photos.FamilyPhotosView
+        android:id="@+id/family_photos_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 

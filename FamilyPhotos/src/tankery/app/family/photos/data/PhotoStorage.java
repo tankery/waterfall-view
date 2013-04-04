@@ -22,7 +22,7 @@ public class PhotoStorage {
      */
     public interface PhotoStorageListener {
         void onListFetchingFinished();
-        void onPhotoReceived(int id);
+        void onPhotoReceived(String key);
         void onPhotoFetchingFinished(ArrayList<Integer> updatedIdList);
         void onStorageErrorOccurred(PhotoStorageError err);
     }
@@ -67,8 +67,12 @@ public class PhotoStorage {
                 if (wbmp != null && wbmp.bitmap != null &&
                         !wbmp.bitmap.isRecycled()) {
                     // already have this picture, delete the new bitmap.
-                    if (bmp.bitmap != null && !bmp.bitmap.isRecycled())
+                    if (bmp.bitmap != null &&
+                        !bmp.bitmap.isRecycled() &&
+                        bmp.bitmap != wbmp.bitmap) {
                         bmp.bitmap.recycle();
+                        bmp.bitmap = null;
+                    }
                     bmp = wbmp;
                 }
                 else {
@@ -78,7 +82,9 @@ public class PhotoStorage {
                     photoTableLock.unlock();
                 }
                 updatedPhotoIdList.add(id);
-                photoStorageListener.onPhotoReceived(id);
+                if (bmp.bitmap.isRecycled())
+                    Log.v(tag, "photo " + bmp.url + ", recycled.");
+                photoStorageListener.onPhotoReceived(bmp.url);
             }
 
             @Override
@@ -167,7 +173,7 @@ public class PhotoStorage {
         photoTableLock.unlock();
     }
 
-    private int generateId(String url) {
+    public static int generateId(String url) {
         return url.hashCode();
     }
 

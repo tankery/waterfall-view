@@ -1,48 +1,31 @@
 package tankery.app.family.photos.widget;
 
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-
-import tankery.app.family.photos.data.PhotoStorage;
+import tankery.app.family.photos.data.CachedBitmap;
+import tankery.app.family.photos.data.CachedBitmap.BitmapHolder;
 import android.content.Context;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.util.AttributeSet;
 import android.util.Log;
 import android.widget.ImageView;
 
-public class WaterfallItem extends ImageView {
+public class WaterfallItem extends ImageView implements BitmapHolder {
 
     static final String tag = "WaterfallItem";
 
-    private int photoId = 0;
-
-    @Override
-    public String toString() {
-        return String.valueOf(photoId);
-    }
+    private CachedBitmap mCachedBitmap;
 
     public WaterfallItem(Context context) {
         super(context);
     }
 
-    public WaterfallItem(Context context, AttributeSet attrs) {
-        super(context, attrs);
+    @Override
+    public String toString() {
+        return "Resource " + mCachedBitmap.toString();
     }
 
-    public WaterfallItem(Context context, AttributeSet attrs, int defStyle) {
-        super(context, attrs, defStyle);
-    }
-
-    public boolean setImageBitmap(int id) {
-        photoId = id;
-        // get photo from photo table by id.
-        Bitmap bmp = PhotoStorage.getInstance().getPhoto(id);
-        if (bmp == null) {
-            Log.e(tag, "Bitmap [" + id + "] is null when addPhoto.");
-            return false;
-        }
-        setImageBitmap(bmp);
+    public boolean setCachedBitmap(CachedBitmap cbmp) {
+        mCachedBitmap = cbmp;
+        mCachedBitmap.setHolder(this);
+        resetBitamp(mCachedBitmap);
 
         return true;
     }
@@ -50,79 +33,47 @@ public class WaterfallItem extends ImageView {
     ///////////////////////////////////
     // memory management.
 
-    private enum MemoryState {
-        DONOTHING,
-        NEED_RELOAD,
-        NEED_RECYCLE
-    }
-
-    private MemoryState memoryState = MemoryState.DONOTHING;
-
-    public void reloadIfNeed() {
-        if (memoryState.ordinal() < MemoryState.NEED_RELOAD.ordinal())
-            memoryState = MemoryState.NEED_RELOAD;
-    }
-
-    public void recycleIfNeed() {
-        if (memoryState.ordinal() < MemoryState.NEED_RECYCLE.ordinal())
-            memoryState = MemoryState.NEED_RECYCLE;
-    }
-
-    public boolean needReload() {
-        return memoryState == MemoryState.NEED_RELOAD;
-    }
-
-    public boolean needRecycle() {
-        return memoryState == MemoryState.NEED_RECYCLE;
-    }
-
     public void reload() {
         Log.d(tag, "reload " + toString());
-        if (photoId == 0)
-            return;
+        assert mCachedBitmap != null;
 
-        Bitmap bmp = PhotoStorage.getInstance().getPhoto(photoId);
-        if (bmp == null || bmp.isRecycled()) {
-            String name = String.valueOf(photoId);
-            try {
-                FileInputStream fis =
-                        getContext().getApplicationContext()
-                                    .openFileInput(name);
-                final Bitmap newBmp = BitmapFactory.decodeStream(fis);
-                if (newBmp == null || newBmp.getWidth() <= 0 ||
-                    newBmp.getHeight() <= 0) {
-                    Log.e(tag, "Bitmap is null decode from " + name);
-                    return;
-                }
-                PhotoStorage.getInstance().setPhoto(photoId, newBmp);
-
-                WaterfallItemColumn column = (WaterfallItemColumn) getParent();
-                if (column != null)
-                    column.setPhoto(this, photoId);
-
-                // if parent is null, means this view is remove from the parent,
-                // do nothing.
-            } catch (FileNotFoundException e) {
-                Log.e(tag, e.getMessage());
-                return;
-            }
-        }
-
-        if (memoryState == MemoryState.NEED_RELOAD)
-            memoryState = MemoryState.DONOTHING;
+        mCachedBitmap.setInUse(true);
     }
 
     public void recycle() {
-        Log.d(tag, "recycle " + toString());
-        // set the bitmap in PhotoStorage will cause the old one
-        // recycle.
-        PhotoStorage.getInstance().setPhoto(photoId, null);
+        Log.d(tag, "recycle Bitmap " + mCachedBitmap.getBitmap() + ", key " + toString());
+        assert mCachedBitmap != null;
 
-        // set this null bitmap to item.
-        ((WaterfallItemColumn) getParent()).setPhoto(this, photoId);
+        // set this null bitmap to item
+        setImageBitmap(null);
+        mCachedBitmap.setInUse(false);
+    }
 
-        if (memoryState == MemoryState.NEED_RECYCLE)
-            memoryState = MemoryState.DONOTHING;
+
+    /**************************************************
+     * BitmapHolder Implements
+     **************************************************/
+
+    @Override
+    public void resetBitamp(CachedBitmap cbmp) {
+        if (cbmp == null)
+            return;
+
+        if (cbmp.getKey().compareTo(mCachedBitmap.getKey()) != 0) {
+            Log.e(tag, "Can't reset a bitmap mismatch key, returned");
+            return;
+        }
+
+        Bitmap bmp = cbmp.getBitmap();
+        if (bmp == null || bmp.isRecycled()) {
+            Log.e(tag, "Bitmap [" + cbmp + "] is " +
+                    (bmp == null ? "null" : "recycled") +
+                    " when resetBitamp.");
+            return;
+        }
+
+        Log.d(tag, "reset Bitmap " + bmp + ", key " + toString());
+        setImageBitmap(bmp);
     }
 
 }

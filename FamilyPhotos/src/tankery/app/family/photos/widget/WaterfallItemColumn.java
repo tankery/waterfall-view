@@ -3,21 +3,15 @@
  */
 package tankery.app.family.photos.widget;
 
-import java.lang.ref.WeakReference;
 import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.Queue;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import tankery.app.family.photos.data.PhotoStorage;
+import tankery.app.family.photos.data.CachedBitmap;
 import tankery.app.family.photos.utils.AlgorithmHelper;
 
 import android.content.Context;
 import android.graphics.Bitmap;
-import android.os.AsyncTask;
-import android.os.Handler;
-import android.os.Message;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.SparseArray;
@@ -68,68 +62,26 @@ public class WaterfallItemColumn extends LinearLayout {
         setLayoutParams(itemParam);
     }
 
-    private static final int MSG_CLEAR_VIEWS = 0;
-    private static final int MSG_ADD_PHOTO = 1;
-    private static final int MSG_SET_PHOTO = 2;
-
-    private final Handler itemsChangeHandler = new ItemsChangeHandler(this);
-
-    private final static class ItemsChangeHandler extends Handler {
-
-        private WeakReference<WaterfallItemColumn> mColumn;
-
-        ItemsChangeHandler(WaterfallItemColumn column) {
-            mColumn = new WeakReference<WaterfallItemColumn>(column);
-        }
-
-        @Override
-        public void handleMessage(Message msg) {
-            switch(msg.what) {
-            case MSG_CLEAR_VIEWS:
-                mColumn.get().doClear();
-                break;
-            case MSG_ADD_PHOTO:
-                mColumn.get().doAddPhoto(msg.arg1);
-                break;
-            case MSG_SET_PHOTO:
-                mColumn.get().doSetPhoto(msg.arg1, msg.arg2);
-                break;
-            default:
-                break;
-            }
-        }
-    }
-
     public void clear() {
-        itemsChangeHandler.obtainMessage(MSG_CLEAR_VIEWS).sendToTarget();
-    }
-
-    public void addPhoto(int id) {
-        itemsChangeHandler.obtainMessage(MSG_ADD_PHOTO, id, 0).sendToTarget();
-    }
-
-    public void setPhoto(WaterfallItem item, int photoId) {
-        itemsChangeHandler.obtainMessage(MSG_SET_PHOTO, photoId, item.getId()).sendToTarget();
-    }
-
-    private void doClear() {
         itemIdTableLock.lock();
         itemIdTable.clear();
         itemIdTableLock.unlock();
         removeAllViews();
     }
 
-    private void doAddPhoto(int id) {
+    public void addBitmap(CachedBitmap cbmp) {
         // get photo from photo table by id.
-        Bitmap bmp = PhotoStorage.getInstance().getPhoto(id);
-        if (bmp == null) {
-            Log.e(tag, "Bitmap [" + id + "] is null when addPhoto.");
+        Bitmap bmp = cbmp.getBitmap();
+        if (bmp == null || bmp.isRecycled()) {
+            Log.e(tag, "Bitmap [" + cbmp + "] is " +
+                    (bmp == null ? "null" : "recycled") +
+                    " when addPhoto.");
             return;
         }
 
         // create item view and map current position to its id
-        WaterfallItem view = new WaterfallItem(getContext());
-        view.setPadding(0, 2, 0, 2);
+        WaterfallItem item = new WaterfallItem(getContext());
+        item.setPadding(0, 2, 0, 2);
 
         int width = bmp.getWidth();
         int height = bmp.getHeight();
@@ -139,31 +91,19 @@ public class WaterfallItemColumn extends LinearLayout {
             layoutHeight = 1;
         LinearLayout.LayoutParams itemParam = new LinearLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, layoutHeight);
-        view.setLayoutParams(itemParam);
-        view.setImageBitmap(id);
+        item.setLayoutParams(itemParam);
+        item.setCachedBitmap(cbmp);
 
         // measure the layout before adding new photo.
         measure(0, 0);
 
         itemIdTableLock.lock();
-        view.setId(itemIdTable.size());
-        itemIdTable.append(getMeasuredHeight(), view);
+        item.setId(itemIdTable.size());
+        itemIdTable.append(getMeasuredHeight(), item);
         itemIdTableLock.unlock();
 
         // at last, add it to item column.
-        addView(view);
-    }
-
-    private void doSetPhoto(int photoId, int itemId) {
-        WaterfallItem item = (WaterfallItem) findViewById(itemId);
-        if (item == null) {
-            Log.e(tag, "WaterfallItem [" + itemId + "] is null when setPhoto.");
-            return;
-        }
-        // get photo from photo table by id.
-        Bitmap bmp = PhotoStorage.getInstance().getPhoto(photoId);
-        // set null bitmap is validate.
-        item.setImageBitmap(bmp);
+        addView(item);
     }
 
     /**
@@ -288,34 +228,6 @@ public class WaterfallItemColumn extends LinearLayout {
         }
     }
 
-    private Queue<WaterfallItem> dirtyItemsList = new LinkedList<WaterfallItem>();
-    Lock dirtyItemsListLock = new ReentrantLock();
-
-    private class ItemsReloadRecycleTask extends AsyncTask<Object, Object, Object> {
-        @Override
-        protected Object doInBackground(Object... obj) {
-            Log.d(tag, "new task.");
-            while (dirtyItemsList.size() > 0) {
-                dirtyItemsListLock.lock();
-                WaterfallItem item = dirtyItemsList.poll();
-                dirtyItemsListLock.unlock();
-                if (item.needRecycle())
-                    item.recycle();
-                else if (item.needReload())
-                    item.reload();
-            }
-            Log.d(tag, "end task.");
-            return null;
-        }
-
-        @Override
-        protected void onPostExecute(Object obj) {
-            itemsReloadRecycleTask = null;
-        }
-    }
-
-    private ItemsReloadRecycleTask itemsReloadRecycleTask = null;
-
     private void reloadItems(final ArrayList<WaterfallItem> itemsNeedReload) {
         if (itemsNeedReload == null || itemsNeedReload.isEmpty())
             return;
@@ -323,17 +235,7 @@ public class WaterfallItemColumn extends LinearLayout {
         Log.d(tag, "reload items: " + itemsNeedReload.toString());
 
         for (WaterfallItem view : itemsNeedReload) {
-            view.reloadIfNeed();
-            if (!dirtyItemsList.contains(view)) {
-                dirtyItemsListLock.lock();
-                dirtyItemsList.add(view);
-                dirtyItemsListLock.unlock();
-            }
-        }
-
-        if (itemsReloadRecycleTask == null) {
-            itemsReloadRecycleTask = new ItemsReloadRecycleTask();
-            itemsReloadRecycleTask.execute();
+            view.reload();
         }
     }
 
@@ -344,17 +246,7 @@ public class WaterfallItemColumn extends LinearLayout {
         Log.d(tag, "recycle items: " + itemsNeedRecycle.toString());
 
         for (WaterfallItem view : itemsNeedRecycle) {
-            view.recycleIfNeed();
-            if (!dirtyItemsList.contains(view)) {
-                dirtyItemsListLock.lock();
-                dirtyItemsList.add(view);
-                dirtyItemsListLock.unlock();
-            }
-        }
-
-        if (itemsReloadRecycleTask == null) {
-            itemsReloadRecycleTask = new ItemsReloadRecycleTask();
-            itemsReloadRecycleTask.execute();
+            view.recycle();
         }
     }
 

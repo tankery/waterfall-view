@@ -1,20 +1,13 @@
 package tankery.app.family.photos.widget;
 
-import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Random;
 
-import tankery.app.family.photos.data.PhotoStorage;
-import tankery.app.family.photos.data.PhotoStorage.PhotoStorageError;
-import tankery.app.family.photos.data.PhotoStorage.PhotoStorageListener;
-import tankery.app.family.photos.R;
+import tankery.app.family.photos.data.CachedBitmap;
 
 import android.content.Context;
 import android.graphics.Color;
-import android.os.Handler;
-import android.os.Message;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.WindowManager;
 import android.widget.LinearLayout;
 import android.widget.Toast;
@@ -29,20 +22,15 @@ import android.widget.Toast;
  */
 public class WaterfallView extends LazyVScrollView {
 
-    private static final String tag = "WaterfallView";
+    static final String LOGTAG = "WaterfallView";
 
     private static final int BACKGROUND_COLOR = Color.WHITE;
-    private static final int PHOTO_FETCHING_COUNT = 30;
+    private static final int DEFAULT_COLUMN_COUNT = 3;
 
-    private int columnCount = 3;
+    private int columnCount = 0;
     private int columnWidth;
 
     private ArrayList<WaterfallItemColumn> itemColumns;
-
-    private enum WaterfallErrorType {
-        UNKNOW_ERROR,
-        PHOTO_FETCHING_TIMEOUT
-    }
 
     public WaterfallView(Context context) {
         super(context);
@@ -56,66 +44,38 @@ public class WaterfallView extends LazyVScrollView {
         super(context, attrs, defStyle);
     }
 
-    public void init(int colCount) {
-        columnCount = colCount;
-        init();
-    }
-
     public void init() {
-        initLayout();
-        PhotoStorage storage = PhotoStorage.getInstance();
-        storage.setPhotoCompressedWidth(columnWidth);
-        storage.setUseTempPhotoFile(getContext());
-        storage.setOnFetchingFinishedListener(
-               new PhotoStorageListener() {
-
-                   @Override
-                   public void onListFetchingFinished() {
-                       needAppendNewItems();
-                   }
-
-                   @Override
-                   public void onPhotoReceived(int id) {
-                       ArrayList<Integer> list = new ArrayList<Integer>();
-                       list.add(id);
-                       doAppendNewItems(list);
-                   }
-
-                   @Override
-                   public void onPhotoFetchingFinished(
-                           ArrayList<Integer> updatedIdList) {
-                       // don't append new item when finished
-                       // cause i have move the new item adding to the time
-                       // each photo received.
-                       // doAppendNewItems(updatedIdList);
-                   }
-
-                   @Override
-                   public void onStorageErrorOccurred(PhotoStorageError err) {
-                       switch (err) {
-                       case HTTP_CONNETION_TIMEOUT:
-                           int what = WaterfallErrorType.PHOTO_FETCHING_TIMEOUT.ordinal();
-                           waterfallErrorHandler.obtainMessage(what)
-                                                .sendToTarget();
-                           break;
-                       default:
-                           what = WaterfallErrorType.UNKNOW_ERROR.ordinal();
-                           waterfallErrorHandler.obtainMessage(what, err.name())
-                                                .sendToTarget();
-                           break;
-                       }
-                   }
-               });
-        storage.refreshPhotoList();
-        // append new item at initial.
-        needAppendNewItems();
+        init(DEFAULT_COLUMN_COUNT);
     }
 
-    protected void showUserMessage(String msg) {
+    public void init(int colCount) {
+        initLayout();
+        setColumnCount(colCount);
+    }
+
+    public void setColumnCount(int count) {
+        if (columnCount == count)
+            return;
+
+        int oldCount = columnCount;
+        columnCount = count;
+        columnWidth = getDisplayWidth();
+        updateColumns(oldCount, columnCount);
+    }
+
+    public int getColumnCount() {
+        return columnCount;
+    }
+
+    public int getColumnWidth() {
+        return columnWidth;
+    }
+
+    public void showUserMessage(String msg) {
         Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
     }
 
-    protected void showUserMessage(int resId) {
+    public void showUserMessage(int resId) {
         Toast.makeText(getContext(), resId, Toast.LENGTH_SHORT).show();
     }
 
@@ -129,19 +89,44 @@ public class WaterfallView extends LazyVScrollView {
         child.setOrientation(LinearLayout.HORIZONTAL);
         child.setLayoutParams(itemParam);
         child.setBackgroundColor(BACKGROUND_COLOR);
-        super.init(child);
 
-        columnWidth = getDisplayWidth();
+        super.setChild(child);
+    }
+
+    private void updateColumns(int oldCount, int newCount) {
+
+        if (itemColumns == null) {
+            assert oldCount == 0;
+            itemColumns = new ArrayList<WaterfallItemColumn>(newCount);
+        }
+
+        int deltaCount = 0;
+        if (oldCount < newCount) {
+            deltaCount = newCount - oldCount;
+        }
+        else {
+            getChild().removeAllViews();
+            deltaCount = newCount;
+        }
 
         // Add item columns to item columns array.
-        itemColumns = new ArrayList<WaterfallItemColumn>(columnCount);
-        for (int i = 0; i < columnCount; i++) {
-            WaterfallItemColumn itemColumn = new WaterfallItemColumn(context);
+        for (int i = 0; i < deltaCount; i++) {
+            WaterfallItemColumn itemColumn =
+                    new WaterfallItemColumn(getContext());
             itemColumns.add(itemColumn);
             getChild().addView(itemColumn);
 
-            itemColumn.init(columnWidth);
+            itemColumn.init(getColumnWidth());
         }
+    }
+
+    // This method should support low level SDK.
+    @SuppressWarnings("deprecation")
+    private int getDisplayWidth() {
+        // calculate the column width for item columns.
+        WindowManager manager = (WindowManager)
+                getContext().getSystemService(Context.WINDOW_SERVICE);
+        return manager.getDefaultDisplay().getWidth() / columnCount;
     }
 
     @Override
@@ -151,71 +136,30 @@ public class WaterfallView extends LazyVScrollView {
                 col.updateViewport(t, getMeasuredHeight());
             }
         }
+        super.onVScrollChanged(t, oldt);
     }
 
     @Override
     public void onTopReached() {
-        Log.d(tag, "Scrolled to top");
-        showUserMessage(R.string.waterfall_refresh);
-        PhotoStorage.getInstance().refreshPhotoList();
         for (WaterfallItemColumn column : itemColumns) {
             column.clear();
         }
+        super.onTopReached();
     }
 
     @Override
     public void onBottomReached() {
-        Log.d(tag, "Scrolled to bottom");
-        showUserMessage(R.string.waterfall_adding_item);
-        needAppendNewItems();
+        super.onBottomReached();
     }
 
     @Override
     public void onScrolling() {
+        super.onScrolling();
     }
 
-    private final WaterfallErrorHandler waterfallErrorHandler = new WaterfallErrorHandler(this);
-    private final static class WaterfallErrorHandler extends Handler {
-
-        private WeakReference<WaterfallView> mView;
-
-        WaterfallErrorHandler(WaterfallView view) {
-            mView = new WeakReference<WaterfallView>(view);
-        }
-
-        @Override
-        public void handleMessage(Message msg) {
-            final WaterfallErrorType types[] = WaterfallErrorType.values();
-            if (msg.what >= types.length) {
-                Log.e(tag, "msg.what =" + msg.what +
-                           " is out of WaterfallErrorType.");
-                return;
-            }
-            switch (types[msg.what]) {
-            case UNKNOW_ERROR:
-                mView.get().showUserMessage((String) msg.obj);
-                break;
-            case PHOTO_FETCHING_TIMEOUT:
-                mView.get().showUserMessage(R.string.app_err_connection_timeout);
-                break;
-            default:
-                Log.e(tag, types[msg.what].name() + " is invalidate.");
-                break;
-            }
-            PhotoStorage storage = PhotoStorage.getInstance();
-            storage.fetchMorePhotos(PHOTO_FETCHING_COUNT);
-        }
-    }
-
-    // Note this function can only calling in UI thread.
-    private void needAppendNewItems() {
-        PhotoStorage storage = PhotoStorage.getInstance();
-        storage.fetchMorePhotos(PHOTO_FETCHING_COUNT);
-    }
-
-    private void doAppendNewItems(ArrayList<Integer> updatedIdList) {
-        for (int id : updatedIdList) {
-            columnNeedAdding().addPhoto(id);
+    public void appendNewBitmaps(ArrayList<CachedBitmap> bitmaps) {
+        for (CachedBitmap cbmp : bitmaps) {
+            columnNeedAdding().addBitmap(cbmp);
         }
     }
 
@@ -236,15 +180,6 @@ public class WaterfallView extends LazyVScrollView {
             }
         }
         return shortest;
-    }
-
-    // This method should support low level SDK.
-    @SuppressWarnings("deprecation")
-    private int getDisplayWidth() {
-        // calculate the column width for item columns.
-        WindowManager manager = (WindowManager)
-                getContext().getSystemService(Context.WINDOW_SERVICE);
-        return manager.getDefaultDisplay().getWidth() / columnCount;
     }
 
     @Override
