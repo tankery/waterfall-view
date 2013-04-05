@@ -89,19 +89,13 @@ public class WebResourceLoader extends Thread {
     };
 
     private UiTaskHandler mUiTaskHandler;
-
     private Queue<ResourceRequest> mResourceRequestList;
+    private static WebResourceLoader mInstance;
 
-    public WebResourceLoader() {
-        super("WebResourceLoader");
-
-        // Create handler in UI thread.
-        mUiTaskHandler = new UiTaskHandler(Looper.getMainLooper());
-
-        mResourceRequestList = new ConcurrentLinkedQueue<ResourceRequest>();
-
-        // start the thread.
-        start();
+    public static synchronized WebResourceLoader getInstance() {
+        if (mInstance == null)
+            mInstance = new WebResourceLoader();
+        return mInstance;
     }
 
     public synchronized void addResourceLoadRequest(String url,
@@ -117,6 +111,18 @@ public class WebResourceLoader extends Thread {
         mUiTaskHandler.removeMessages(NetworkError.NO_ERROR.ordinal());
         mResourceRequestList.clear();
         wakeUp();
+    }
+
+    private WebResourceLoader() {
+        super("WebResourceLoader");
+
+        // Create handler in UI thread.
+        mUiTaskHandler = new UiTaskHandler(Looper.getMainLooper());
+
+        mResourceRequestList = new ConcurrentLinkedQueue<ResourceRequest>();
+
+        // start the thread.
+        start();
     }
 
     private void wakeUp() {
@@ -152,8 +158,26 @@ public class WebResourceLoader extends Thread {
         if (urlStr == null || urlStr.isEmpty() || request.mCallback == null)
             return;
 
+        Object obj = null;
+        InputStream resourceStream = openNetworkStream(request);
+
+        if (resourceStream != null) {
+            obj = request.mDecoder.decodeFromStream(urlStr, resourceStream);
+        }
+
+        if (obj != null) {
+            request.mResponseData = obj;
+            mUiTaskHandler.obtainMessage(NetworkError.NO_ERROR.ordinal(),
+                                         request).sendToTarget();
+        } else
+            mUiTaskHandler.obtainMessage(NetworkError.RESOURCE_NOT_FOUNT.ordinal(),
+                                         request).sendToTarget();
+    }
+
+    private InputStream openNetworkStream(ResourceRequest request) {
+        InputStream resourceStream = null;
         try {
-            Object obj = null;
+            String urlStr = request.mUrl;
             URL url = new URL(urlStr);
             URLConnection conn = url.openConnection();
             try {
@@ -164,17 +188,8 @@ public class WebResourceLoader extends Thread {
                 if (protocol.equals("file") ||
                     (protocol.equals("http") && ((HttpURLConnection) conn).getResponseCode()
                         == HttpURLConnection.HTTP_OK)) {
-                    InputStream is = conn.getInputStream();
-                    obj = request.mDecoder.decodeFromStream(urlStr, is);
+                    resourceStream = conn.getInputStream();
                 }
-
-                if (obj != null) {
-                    request.mResponseData = obj;
-                    mUiTaskHandler.obtainMessage(NetworkError.NO_ERROR.ordinal(),
-                                                 request).sendToTarget();
-                } else
-                    mUiTaskHandler.obtainMessage(NetworkError.RESOURCE_NOT_FOUNT.ordinal(),
-                                                 request).sendToTarget();
             } catch (SocketException e) {
                 Log.e(tag, (e.getMessage() == null ?
                         "Unknow Socket exception" :
@@ -207,6 +222,8 @@ public class WebResourceLoader extends Thread {
             mUiTaskHandler.obtainMessage(NetworkError.UNKNOW_IO_ERROR.ordinal(),
                                          request).sendToTarget();
         }
+
+        return resourceStream;
     }
 
 }

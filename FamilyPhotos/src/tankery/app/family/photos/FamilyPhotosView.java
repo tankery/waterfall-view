@@ -5,21 +5,18 @@ import java.util.ArrayList;
 
 import tankery.app.family.photos.R;
 import tankery.app.family.photos.data.CachedBitmap;
-import tankery.app.family.photos.data.CachedPhoto;
-import tankery.app.family.photos.data.PhotoStorage;
-import tankery.app.family.photos.data.PhotoStorage.PhotoStorageError;
-import tankery.app.family.photos.data.PhotoStorage.PhotoStorageListener;
-import tankery.app.family.photos.data.BitmapLoader;
+import tankery.app.family.photos.data.PhotoList;
+import tankery.app.family.photos.data.PhotoList.PhotoListError;
+import tankery.app.family.photos.data.PhotoList.PhotoListListener;
 import tankery.app.family.photos.widget.WaterfallView;
 import android.content.Context;
-import android.graphics.Bitmap;
 import android.os.Handler;
 import android.os.Message;
 import android.util.AttributeSet;
 import android.util.Log;
 
 public class FamilyPhotosView extends WaterfallView
-                              implements PhotoStorageListener {
+                              implements PhotoListListener {
 
     private static final String LOGTAG = "FamilyPhotosView";
 
@@ -30,7 +27,7 @@ public class FamilyPhotosView extends WaterfallView
 
     private static final int PHOTO_FETCHING_COUNT = 30;
 
-    private BitmapLoader mBitmapLoader = null;
+    private PhotoList mPhotoList;
 
     public FamilyPhotosView(Context context) {
         super(context);
@@ -47,22 +44,19 @@ public class FamilyPhotosView extends WaterfallView
     @Override
     public void init() {
         super.init();
-        initStorage();
-        mBitmapLoader = new BitmapLoader(getContext());
     }
 
     @Override
     public void init(int column) {
         super.init(column);
-        initStorage();
+        initPhotoList();
     }
 
-    private void initStorage() {
-        PhotoStorage storage = PhotoStorage.getInstance();
-        storage.setPhotoCompressedWidth(getColumnWidth());
-        storage.setUseTempPhotoFile(getContext());
-        storage.setOnFetchingFinishedListener(this);
-        storage.refreshPhotoList();
+    private void initPhotoList() {
+        mPhotoList = new PhotoList(getContext());
+        mPhotoList.setPhotoCompressedWidth(getColumnWidth());
+        mPhotoList.setFetchingFinishedListener(this);
+        mPhotoList.refreshPhotoList();
         // append new item at initial.
         needAppendNewItems();
     }
@@ -102,8 +96,7 @@ public class FamilyPhotosView extends WaterfallView
 
     // Note this function can only calling in UI thread.
     private void needAppendNewItems() {
-        PhotoStorage storage = PhotoStorage.getInstance();
-        storage.fetchMorePhotos(PHOTO_FETCHING_COUNT);
+        mPhotoList.fetchMorePhotos(PHOTO_FETCHING_COUNT);
     }
 
 
@@ -120,7 +113,7 @@ public class FamilyPhotosView extends WaterfallView
     public void onTopReached() {
         Log.d(LOGTAG, "Scrolled to top");
         showUserMessage(R.string.waterfall_refresh);
-        PhotoStorage.getInstance().refreshPhotoList();
+        mPhotoList.refreshPhotoList();
         super.onTopReached();
     }
 
@@ -139,7 +132,7 @@ public class FamilyPhotosView extends WaterfallView
 
 
     /**************************************************
-     * PhotoStorageListener Implements
+     * PhotoListListener Implements
      **************************************************/
 
     @Override
@@ -148,27 +141,14 @@ public class FamilyPhotosView extends WaterfallView
     }
 
     @Override
-    public void onPhotoReceived(String key) {
+    public void onPhotoReceived(CachedBitmap cbmp) {
         ArrayList<CachedBitmap> list = new ArrayList<CachedBitmap>();
-        // FIXME: should refactor this part, we should delay load the bitmap.
-        Bitmap bmp = PhotoStorage.getInstance()
-                .getPhoto(PhotoStorage.generateId(key));
-        CachedPhoto cbmp = new CachedPhoto(bmp, mBitmapLoader, key);
         list.add(cbmp);
         super.appendNewBitmaps(list);
     }
 
     @Override
-    public void onPhotoFetchingFinished(
-            ArrayList<Integer> updatedIdList) {
-        // don't append new item when finished
-        // cause i have move the new item adding to the time
-        // each photo received.
-        // doAppendNewItems(updatedIdList);
-    }
-
-    @Override
-    public void onStorageErrorOccurred(PhotoStorageError err) {
+    public void onErrorOccurred(PhotoListError err) {
         switch (err) {
         case HTTP_CONNETION_TIMEOUT:
             int what = WaterfallErrorType.PHOTO_FETCHING_TIMEOUT.ordinal();

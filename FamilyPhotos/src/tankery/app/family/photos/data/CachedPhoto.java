@@ -1,30 +1,17 @@
 package tankery.app.family.photos.data;
 
-import tankery.app.family.photos.data.BitmapLoader.BitmapReceivedCallback;
+import tankery.app.family.photos.data.PhotoLoader.BitmapReceivedCallback;
 import android.graphics.Bitmap;
 
 
 public class CachedPhoto extends CachedBitmap
                              implements BitmapReceivedCallback {
 
-    private BitmapLoader mLoader;
+    private PhotoLoader mLoader;
 
-    public CachedPhoto(BitmapLoader loader, String key) {
+    public CachedPhoto(PhotoLoader loader, String key) {
         super(key);
         mLoader = loader;
-    }
-
-    /**
-     * TODO: this method need to be removed after refactor.
-     * @param initBmp
-     * @param loader
-     * @param key
-     */
-    public CachedPhoto(Bitmap initBmp, BitmapLoader loader, String key) {
-        this(loader, key);
-
-        super.setInUse(true);
-        onBitmapRecieved(initBmp);
     }
 
     @Override
@@ -49,7 +36,6 @@ public class CachedPhoto extends CachedBitmap
 
     public void recycle() {
         clearBitmapIfNotUse();
-        mLoader.recycle(getKey());
     }
 
 

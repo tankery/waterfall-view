@@ -1,5 +1,7 @@
 package tankery.app.family.photos.data;
 
+import java.lang.ref.WeakReference;
+
 import android.graphics.Bitmap;
 
 public abstract class CachedBitmap {
@@ -12,7 +14,7 @@ public abstract class CachedBitmap {
     private Bitmap mBitmap;
     private boolean mInUse;
 
-    private BitmapHolder mHolder;
+    private WeakReference<BitmapHolder> mHolder;
 
     public CachedBitmap(String key) {
         mKey = key;
@@ -43,7 +45,7 @@ public abstract class CachedBitmap {
     }
 
     public void setHolder(BitmapHolder holder) {
-        mHolder = holder;
+        mHolder = new WeakReference<BitmapHolder>(holder);
     }
 
     public void clearBitmapIfNotUse() {
@@ -53,8 +55,8 @@ public abstract class CachedBitmap {
 
     protected void updateBitmap(Bitmap bmp) {
         mBitmap = bmp;
-        if (mHolder != null && mInUse) {
-            mHolder.resetBitamp(this);
+        if (mHolder != null && mHolder.get() != null && mInUse) {
+            mHolder.get().resetBitamp(this);
         }
     }
 
