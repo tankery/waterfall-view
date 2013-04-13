@@ -10,7 +10,6 @@ import android.graphics.Color;
 import android.util.AttributeSet;
 import android.view.WindowManager;
 import android.widget.LinearLayout;
-import android.widget.Toast;
 
 /**
  * The Waterfall view is a lazy vertical scroll view,
@@ -69,14 +68,6 @@ public class WaterfallView extends LazyVScrollView {
 
     public int getColumnWidth() {
         return columnWidth;
-    }
-
-    public void showUserMessage(String msg) {
-        Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
-    }
-
-    public void showUserMessage(int resId) {
-        Toast.makeText(getContext(), resId, Toast.LENGTH_SHORT).show();
     }
 
     private void initLayout() {
@@ -157,10 +148,14 @@ public class WaterfallView extends LazyVScrollView {
         super.onScrolling();
     }
 
-    public void appendNewBitmaps(ArrayList<CachedBitmap> bitmaps) {
-        for (CachedBitmap cbmp : bitmaps) {
-            columnNeedAdding().addBitmap(cbmp);
-        }
+    /**
+     * NOTE: The waterfall view can only append the cached bitmap which has been
+     * loaded already now.
+     *
+     * @param bitmap the cached bitmap which has been loaded already.
+     */
+    public void appendBitmap(CachedBitmap bitmap) {
+        columnNeedAdding().addBitmap(bitmap);
     }
 
     Random random = new Random(System.currentTimeMillis());

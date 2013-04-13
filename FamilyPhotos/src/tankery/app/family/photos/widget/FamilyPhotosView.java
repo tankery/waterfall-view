@@ -14,6 +14,7 @@ import android.os.Handler;
 import android.os.Message;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.widget.Toast;
 
 public class FamilyPhotosView extends WaterfallView
                               implements PhotoListListener {
@@ -42,11 +43,6 @@ public class FamilyPhotosView extends WaterfallView
     }
 
     @Override
-    public void init() {
-        super.init();
-    }
-
-    @Override
     public void init(int column) {
         super.init(column);
         initPhotoList();
@@ -66,10 +62,10 @@ public class FamilyPhotosView extends WaterfallView
 
     private final static class WaterfallErrorHandler extends Handler {
 
-        private WeakReference<WaterfallView> mView;
+        private WeakReference<FamilyPhotosView> mView;
 
-        WaterfallErrorHandler(WaterfallView view) {
-            mView = new WeakReference<WaterfallView>(view);
+        WaterfallErrorHandler(FamilyPhotosView view) {
+            mView = new WeakReference<FamilyPhotosView>(view);
         }
 
         @Override
@@ -99,15 +95,18 @@ public class FamilyPhotosView extends WaterfallView
         mPhotoList.fetchMorePhotos(PHOTO_FETCHING_COUNT);
     }
 
+    public void showUserMessage(String msg) {
+        Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
+    }
+
+    public void showUserMessage(int resId) {
+        Toast.makeText(getContext(), resId, Toast.LENGTH_SHORT).show();
+    }
+
 
     /**************************************************
      * WaterfallView Overrides
      **************************************************/
-
-    @Override
-    public void onVScrollChanged(int t, int oldt) {
-        super.onVScrollChanged(t, oldt);
-    }
 
     @Override
     public void onTopReached() {
@@ -125,11 +124,6 @@ public class FamilyPhotosView extends WaterfallView
         super.onBottomReached();
     }
 
-    @Override
-    public void onScrolling() {
-        super.onScrolling();
-    }
-
 
     /**************************************************
      * PhotoListListener Implements
@@ -142,9 +136,7 @@ public class FamilyPhotosView extends WaterfallView
 
     @Override
     public void onPhotoReceived(CachedBitmap cbmp) {
-        ArrayList<CachedBitmap> list = new ArrayList<CachedBitmap>();
-        list.add(cbmp);
-        super.appendNewBitmaps(list);
+        super.appendBitmap(cbmp);
     }
 
     @Override
