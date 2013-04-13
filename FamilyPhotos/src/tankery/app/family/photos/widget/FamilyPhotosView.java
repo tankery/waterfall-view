@@ -4,7 +4,6 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 
 import tankery.app.family.photos.R;
-import tankery.app.family.photos.R.string;
 import tankery.app.family.photos.data.PhotoList;
 import tankery.app.family.photos.data.PhotoList.PhotoListError;
 import tankery.app.family.photos.data.PhotoList.PhotoListListener;
