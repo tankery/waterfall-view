@@ -1,9 +1,9 @@
-package tankery.app.family.photos.widget;
+package tankery.app.modules.waterfall.widget;
 
 import java.util.ArrayList;
 import java.util.Random;
 
-import tankery.app.family.photos.data.CachedBitmap;
+import tankery.app.modules.waterfall.data.CachedBitmap;
 
 import android.content.Context;
 import android.graphics.Color;

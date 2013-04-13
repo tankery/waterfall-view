@@ -3,10 +3,10 @@ package tankery.app.family.photos.data;
 import java.util.ArrayList;
 import java.util.Arrays;
 
-import tankery.app.family.photos.data.CachedBitmap.BitmapHolder;
-import tankery.app.family.photos.net.WebResourceLoader;
 import tankery.app.family.photos.net.WebResourceLoader.NetworkError;
 import tankery.app.family.photos.net.WebResourceLoader.WebResourceCallback;
+import tankery.app.modules.waterfall.data.CachedBitmap;
+import tankery.app.modules.waterfall.data.CachedBitmap.BitmapHolder;
 
 import android.content.Context;
 import android.util.Log;

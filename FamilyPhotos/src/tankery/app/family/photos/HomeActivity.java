@@ -1,5 +1,6 @@
 package tankery.app.family.photos;
 
+import tankery.app.family.photos.widget.FamilyPhotosView;
 import android.os.Bundle;
 import android.app.Activity;
 import android.view.Menu;

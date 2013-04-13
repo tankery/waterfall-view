@@ -1,7 +1,7 @@
-package tankery.app.family.photos.widget;
+package tankery.app.modules.waterfall.widget;
 
-import tankery.app.family.photos.data.CachedBitmap;
-import tankery.app.family.photos.data.CachedBitmap.BitmapHolder;
+import tankery.app.modules.waterfall.data.CachedBitmap;
+import tankery.app.modules.waterfall.data.CachedBitmap.BitmapHolder;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.util.Log;

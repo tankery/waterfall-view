@@ -1,4 +1,4 @@
-package tankery.app.family.photos.widget;
+package tankery.app.modules.waterfall.widget;
 
 import android.content.Context;
 import android.util.AttributeSet;

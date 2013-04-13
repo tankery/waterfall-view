@@ -1,4 +1,4 @@
-package tankery.app.family.photos.data;
+package tankery.app.modules.waterfall.data;
 
 import java.lang.ref.WeakReference;
 

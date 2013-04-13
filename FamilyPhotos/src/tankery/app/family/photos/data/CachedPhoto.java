@@ -1,6 +1,7 @@
 package tankery.app.family.photos.data;
 
 import tankery.app.family.photos.data.PhotoLoader.BitmapReceivedCallback;
+import tankery.app.modules.waterfall.data.CachedBitmap;
 import android.graphics.Bitmap;
 
 

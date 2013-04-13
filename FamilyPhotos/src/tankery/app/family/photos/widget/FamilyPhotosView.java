@@ -1,14 +1,15 @@
-package tankery.app.family.photos;
+package tankery.app.family.photos.widget;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 
 import tankery.app.family.photos.R;
-import tankery.app.family.photos.data.CachedBitmap;
+import tankery.app.family.photos.R.string;
 import tankery.app.family.photos.data.PhotoList;
 import tankery.app.family.photos.data.PhotoList.PhotoListError;
 import tankery.app.family.photos.data.PhotoList.PhotoListListener;
-import tankery.app.family.photos.widget.WaterfallView;
+import tankery.app.modules.waterfall.data.CachedBitmap;
+import tankery.app.modules.waterfall.widget.WaterfallView;
 import android.content.Context;
 import android.os.Handler;
 import android.os.Message;
